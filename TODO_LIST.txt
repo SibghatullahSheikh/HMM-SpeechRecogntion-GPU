@@ -1,0 +1,9 @@
+= HMMSRGPU TODO List =
+
+[] wavread.c
+
+
+== Completed ==
+[done] buffer.c,	buffer.m
+[done] hamming.c, 	hamming.m
+[done] fft.c,		fft.m
