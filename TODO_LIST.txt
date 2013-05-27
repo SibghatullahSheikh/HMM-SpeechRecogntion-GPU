@@ -1,9 +1,21 @@
 = HMMSRGPU TODO List =
 
 [] wavread.c
-
+[] extract_features.c
+[] normalise.c
+[] mk_stochastic.c
+[] cov.c
+[] diag.c
+[] randperm.c
+[] mvnpdf.c
+[] sum.c
+[] repmat.c
+[] symmetrize.c
+[] train_samples.c
+[] test_samples.c
+[] max.c
 
 == Completed ==
-[done] buffer.c,	buffer.m
-[done] hamming.c, 	hamming.m
-[done] fft.c,		fft.m
+[done] buffer.c
+[done] hamming.c
+[done] fft.c
