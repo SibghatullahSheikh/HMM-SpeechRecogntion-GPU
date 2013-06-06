@@ -1,14 +1,8 @@
 = HMMSRGPU TODO List =
 
 [] wavread.c
-[] normalise.c
-[] mk_stochastic.c
-[] cov.c
-[] diag.c
 [] randperm.c
-[] mvnpdf.c
 [] sum.c
-[] repmat.c
 [] symmetrize.c
 [] train_samples.c
 [] test_samples.c
@@ -20,4 +14,13 @@
 [done] fft.c
 [done] findpeaks.c
 [done] extract_features.c
+
+[done] normalise.c
+[done] mk_stochastic.c
+[done] cov.c
+[done] diag_matrix.c
+[done] repmat.c
+
+[] mvnpdf.c
+
 
