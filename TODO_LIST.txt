@@ -21,6 +21,7 @@
 [done] diag_matrix.c
 [done] repmat.c
 
+[done] matrix division(LU Decompostion)
 [] mvnpdf.c
 
 
