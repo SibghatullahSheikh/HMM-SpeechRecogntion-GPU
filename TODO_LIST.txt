@@ -2,10 +2,6 @@
 
 [] wavread.c
 [] randperm.c
-[] sum.c
-[] symmetrize.c
-[] train_samples.c
-[] test_samples.c
 [] max.c
 
 == Completed ==
@@ -22,6 +18,10 @@
 [done] repmat.c
 
 [done] matrix division(LU Decompostion)
-[] mvnpdf.c
+[done] mvnpdf.c
 
+[] repmat.c
+[] symmetrize.c
+[] train_samples.c
 
+[] test_samples.c
