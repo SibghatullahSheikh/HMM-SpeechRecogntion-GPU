@@ -5,6 +5,7 @@
 #include <stdarg.h> // va
 
 #include "feature_extraction.c"
+#include "train.c"
 
 static char *config_file_name="";
 static char *config_nfft="";
@@ -105,8 +106,7 @@ int main(int argc, char*argv[])
 
 	// Use buffer() function to trunk the audio into overlapping frames
 	// frames = buffer(sound, framesize, overlap) 
-	unsigned int Fs = 8000;
-	unsigned int framesize = 128;
+	unsigned int framesize = 128; // equal to NFFT
 	unsigned int overlap = 96;
 	unsigned int featureDim = 6;	// number of freqs in each signal frame
 
@@ -185,7 +185,38 @@ int main(int argc, char*argv[])
 	NFFT = (unsigned int)pow(2, ceil(log2(framesize)));
 	printf("\nNFFT:%d\n", NFFT);
 
+	// extract features
+	// frequency peaks
+	FeatureExtraction_freqpeaks(frames, framefrequencies, featureDim, framesize, frameNum, window, NFFT);
 
+	// check
+/*
+	for (i = 0; i < frameNum; ++i)
+	{
+		for (j = 0; j < featureDim; ++j)
+		{
+			printf("%10.5f ",framefrequencies[j][i]);
+		}
+		printf("\n");
+	}
+*/
+
+
+
+	/*-----------------------------------------------
+	
+		Training 
+
+	-------------------------------------------------*/
+	unsigned int hiddenstates = 3;
+	Train(framefrequencies, featureDim, frameNum, hiddenstates);
+
+
+	/*-----------------------------------------------
+	
+		Training 
+
+	-------------------------------------------------*/
 
 
 	// end of program 
@@ -204,6 +235,7 @@ int main(int argc, char*argv[])
 	free(sound);
 	free(window);
 	free(framefrequencies);
+
 
 
 	return 0;
