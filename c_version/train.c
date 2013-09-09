@@ -178,13 +178,14 @@ void Train(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 	mvnpdf(B,observations_t, mu_t,Sigma,N,T,D); 
 
-
+/*
 	for(i=0;i<N;++i){
 		printf("N=%d", i+1);
 		for(j=0;j<T;++j){
 			printf("%.5e\n",B[i][j]);
 		}
 	}
+*/
 
 /*
 	//---------------------------------------------------------------//
@@ -703,7 +704,8 @@ void mvnpdf(double **B, float **obs, float **mean, float ***cov, unsigned int N,
 		// this is the square matrix
 		chol(sigma,D,D,R);
 		
-		if(k==1){
+		if(1){
+
 			printf("R(%d)\n",k+1);
 			for(i=0;i<D;++i){
 				for(j=0;j<D;++j){
