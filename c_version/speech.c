@@ -209,6 +209,7 @@ int main(int argc, char*argv[])
 
 	-------------------------------------------------*/
 	unsigned int hiddenstates = 3;
+
 	Train(framefrequencies, featureDim, frameNum, hiddenstates);
 
 
