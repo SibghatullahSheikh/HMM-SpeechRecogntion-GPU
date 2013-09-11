@@ -154,10 +154,12 @@ int main(int argc, char*argv[])
 	}
 
 	if(count==0)
+	{
 		printf("buffer right\n");
-	else
+	}else
+	{
 		printf("buffer wrong\n");
-
+	}
 
 	// hamming window coefficients
 	// w = hamming(framesize);
@@ -203,21 +205,20 @@ int main(int argc, char*argv[])
 
 
 
-	/*-----------------------------------------------
-	
-		Training 
-
-	-------------------------------------------------*/
+	//-----------------------------------------------
+	//	Training 
+	//-----------------------------------------------
 	unsigned int hiddenstates = 3;
 
-	Train(framefrequencies, featureDim, frameNum, hiddenstates);
+	TRAIN(framefrequencies, featureDim, frameNum, hiddenstates);
+
+	//-----------------------------------------------
+	//	Testing 
+	//-----------------------------------------------
 
 
-	/*-----------------------------------------------
-	
-		Training 
 
-	-------------------------------------------------*/
+
 
 
 	// end of program 

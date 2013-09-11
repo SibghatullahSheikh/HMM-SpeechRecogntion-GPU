@@ -9,7 +9,7 @@
 #define TWOPI   (2.0*PI)
 #define MAX(a,b) ((a) > (b) ? a : b)
 
-void Train(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates)
+void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates)
 {
 	// observations[D][T]
 
@@ -171,76 +171,73 @@ void Train(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 	// NxT
 	// use double to tolerate the extreme small value
-	double **B = (double**)malloc(sizeof(double*)*N);
+	float **B = (float **)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
-		B[i] = (double*)malloc(sizeof(double)*T);
+		B[i] = (float*)malloc(sizeof(float)*T);
 	}
 
 	mvnpdf(B,observations_t, mu_t,Sigma,N,T,D); 
 
-/*
-	for(i=0;i<N;++i){
-		printf("N=%d", i+1);
-		for(j=0;j<T;++j){
-			printf("%.5e\n",B[i][j]);
-		}
-	}
-*/
+//	for(i=0;i<N;++i){
+//		printf("N=%d \n", i+1);
+//		for(j=0;j<T;++j){
+//			printf("%.5e\n",B[i][j]);
+//		}
+//	}
 
-/*
+
+
 	//---------------------------------------------------------------//
 	//						forward algorithm
 	//---------------------------------------------------------------//
-	double log_likelihood=0;
-	double *alpha=(double*)calloc(N*T,sizeof(double)); // initialize to be zeros
 
-	double *A_al=(double*)calloc(N,sizeof(double)); 
-	double tmp;
-	double alpha_sum;
-
-
-	for(i=0;i<T;i++){
-		if(i==0){
-			for(j=0;j<N;j++){
-				alpha[j*T+i] = B[j*T+i] * prior[j];
-				// printf("%10e\n",alpha[j*T+i]);
-			}
-
-		}else{
-			// alpha(:, t) = B(:, t) .* (A' * alpha(:, t - 1));
-			for(j=0;j<N;j++){//col 
-				tmp = 0;
-				for(k=0;k<N;k++){ //row 
-					tmp += A[k*N+j]*alpha[k*T+i-1];	
-				}
-				A_al[j] = tmp;
-			}
-
-			for(j=0;j<N;j++){
-				alpha[j*T+i] = B[j*T+i] * A_al[j];
-				//if(i==1){
-				//	printf("%10e\n",alpha[j*T+i]);			
-				//}
-			}
-		}	
-
-		// alpha_sum      = sum(alpha(:, t));
-		// alpha(:, t)    = alpha(:, t) ./ alpha_sum; 
-		alpha_sum = 0;
-		for(j=0;j<N;j++){
-			alpha_sum += alpha[j*T+i];
-		}
-		for(j=0;j<N;j++){
-			alpha[j*T+i] /= alpha_sum;
-			//if(i==1 || i==0){
-			//	printf("%10e\n",alpha[j*T+i]);			
-			//}
-		}
-
-		log_likelihood += log(alpha_sum); 
+	float log_likelihood=0.0;
+	// NxT
+	float **alpha= (float**)malloc(sizeof(float*)*N);
+	for(i=0;i<N;++i){
+		alpha[i] = (float*)malloc(sizeof(float)*T);
 	}
-	printf("log_likelihood=%lf\n",log_likelihood);
 
+	ForwardAlgo(B,A,prior,alpha,N,T,&log_likelihood);
+
+	printf("log_likelihood=%f\n",log_likelihood);
+
+
+	//---------
+	// release
+	//---------
+	free(prior);
+	for(i=0;i<N;++i){
+		free(A[i]);
+		free(mu_t[i]);
+		free(B[i]);
+	}
+	for(i=0;i<T;++i){
+		free(observations_t[i]);
+	}
+	for(i=0;i<D;++i){
+		free(diag_diag_cov[i]);
+		free(mu[i]);
+	}
+	// 3D sigma
+	for(i=0;i<D;++i){
+		for(j=0;j<D;++j){
+			free(Sigma[i][j]);
+		}
+	}
+	for(i=0;i<D;++i){
+		free(Sigma[i]);
+	}
+
+	free(B);
+	free(A);
+	free(observations_t);
+	free(diag_diag_cov);
+	free(Sigma);
+	free(mu);
+
+	exit(1);
+	/*
 
 	//---------------------------------------------------------------//
 	//						backward algorithm
@@ -547,41 +544,6 @@ void Train(float **observations, unsigned int featureDim, unsigned int frameNum,
 	free(observations);
 */
 
-
-
-
-	// release
-	free(prior);
-	for(i=0;i<N;++i){
-		free(A[i]);
-		free(mu_t[i]);
-		free(B[i]);
-	}
-	for(i=0;i<T;++i){
-		free(observations_t[i]);
-	}
-	for(i=0;i<D;++i){
-		free(diag_diag_cov[i]);
-		free(mu[i]);
-	}
-	// 3D sigma
-	for(i=0;i<D;++i){
-		for(j=0;j<D;++j){
-			free(Sigma[i][j]);
-		}
-	}
-	for(i=0;i<D;++i){
-		free(Sigma[i]);
-	}
-
-
-	free(A);
-	free(observations_t);
-	free(diag_diag_cov);
-	free(Sigma);
-	free(mu);
-	free(B);
-
 }
 
 void transpose(float **in, float **out, unsigned int row, unsigned int col)
@@ -632,7 +594,7 @@ void cov(float **input, unsigned int R, unsigned int C, float **result)
 }
 
 // 85x6, 1x6 , 6x6
-void mvnpdf(double **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D)
+void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D)
 {
 	// out:	NxT
 	// obs: TxD
@@ -699,12 +661,23 @@ void mvnpdf(double **B, float **obs, float **mean, float ***cov, unsigned int N,
 			}	
 		}
 
+		if(k==0 && 0){
+
+			printf("sigma(%d)\n",k+1);
+			for(i=0;i<D;++i){
+				for(j=0;j<D;++j){
+					printf("%f ",sigma[i][j]);
+				}
+				printf("\n");
+			}
+		}
+
 
 		// R = chol(sigma);
 		// this is the square matrix
-		chol(sigma,D,D,R);
+		cholcov(sigma,D,D,R);
 		
-		if(1){
+		if(k==0 && 0){
 
 			printf("R(%d)\n",k+1);
 			for(i=0;i<D;++i){
@@ -763,7 +736,7 @@ void mvnpdf(double **B, float **obs, float **mean, float ***cov, unsigned int N,
 
 		// output
 		
-		printf("k=%d\n",k);
+		// printf("k=%d\n",k);
 		for(i=0;i<T;++i){
 			//B[k][i] = exp(-0.5*quadform[i] - data); 
 			tmp = exp(-0.5*quadform[i] - data); 
@@ -804,47 +777,168 @@ void mvnpdf(double **B, float **obs, float **mean, float ***cov, unsigned int N,
 
 }
 
-
-void chol(float **sigma, unsigned int row, unsigned int col, float **C)
+// Cholesky-like covariance decomposition
+void cholcov(float **sigma, unsigned int row, unsigned int col, float **C)
 {
-    // cholesky fractorization
-    // reference : http://web.cecs.pdx.edu/~gerry/nmm/mfiles/linalg/Cholesky.m
-    if(row != col){
-        printf("Sigma must be square. file:%s,line:%d\n", __FILE__, __LINE__);
-        exit(1);
-    }
 
-    unsigned int i,j,m;
-    float s;
-    double tmp;
-    for(i=0;i<col;++i){
-        for(j=i;j<col;++j){
-            if(j==0){
-                s = sigma[i][i]; // i=0,j=0 is special case
-            }else{
-                tmp=0.0;
-                for(m=0;m<=i;++m){
-                    tmp = tmp + C[m][i]*C[m][j];
-                }
-                s = sigma[i][j] - (float)tmp;
-                //s = tmp;  
-                // printf("%lf\n",tmp);
-            }
+	if(row != col){
+		printf("Current cholcov() only works for square matrix! FILE:%s, LINE:%d",__FILE__,__LINE__);
+		exit(1);
+	}
 
-            if(j>i){
-                C[i][j] = s/C[i][i];
-            }else{
-                //if(s<=0){
-                //    printf("C is not positive definite to working precision. file:%s, line:%d\n", __FILE__, __LINE__);
-                //    exit(1);
-                //}
-                C[i][i] = sqrt(s);
-            }
-            //printf("%lf \n", C[i*col+i]);
-        }
-        //printf("\n");
-    }
+	unsigned int n = row;
+	unsigned int i,j,k;
+	double tmp;
+
+	//x = sigma+sigma';
+	float **x = (float**) malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		x[i] = (float*) malloc(sizeof(float)*n);
+	}
+
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			x[i][j]	 = (sigma[i][j] + sigma[j][i])/2;
+		}	
+	}
+
+//	printf("\nx=\n");
+//	for(i=0;i<n;++i){
+//		for(j=0;j<n;++j){
+//			printf("%f ",x[i][j]);
+//		}	
+//		printf("\n");
+//	}
+
+//---------------------------
+//	[u,s,v]=jacobi_svd(x/2);
+//	U = v;
+//	D = s;
+//---------------------------
+	float **U;
+	U = (float**)malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		U[i] = (float*)malloc(sizeof(float)*n);
+	}
+
+	float **u;
+	u = (float **)malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		u[i] = (float*)malloc(sizeof(float)*n);
+	}
+
+	float **D;
+	D = (float **)malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		D[i] = (float*)malloc(sizeof(float)*n);
+	}
+
+	svd(x,u,D,U,n);
+
+//	printf("D=\n");
+//	for(i=0;i<n;++i){
+//		for(j=0;j<n;++j){
+//			printf("%10.5e \t", D[i][j]);
+//		}
+//		printf("\n");
+//	}
+//
+//	printf("U=\n");
+//	for(i=0;i<n;++i){
+//		for(j=0;j<n;++j){
+//			printf("%10.5f \t", U[i][j]);
+//		}
+//		printf("\n");
+//	}
+//
+
+
+//-------------------------------------------
+//	[ignore,maxind] = max(abs(U),[],1);
+//	negloc = (U(maxind + (0:n:(m-1)*n)) < 0);
+//	U(:,negloc) = -U(:,negloc);
+//-------------------------------------------
+
+
+//-------------------------------------------
+//	D = diag(D);
+//	tol = eps(max(D)) * length(D);
+//	t = (abs(D) > tol);
+//	D = D(t);
+//	p = sum(D<0); % number of negative eigenvalues
+//	T = diag(sqrt(D)) * U(:,t)'
+//-------------------------------------------
+	float *diagD = 	(float*)malloc(sizeof(float)*n);
+	int *t = (int*)malloc(sizeof(int)*n);
+
+	float TOL = 1e-8;
+
+	for(i=0;i<n;++i){
+		diagD[i] = D[i][i];
+	}
+
+
+	// these two can be merged
+	for(i=0;i<n;++i){
+		t[i] = (fabs(diagD[i]) > TOL) ? 1:0;
+	}	
+
+	for(i=0;i<n;++i){
+		diagD[i] = (t[i]==1)? diagD[i]:0.f;	
+	}
+
+	// p should always be 0
+
+	// update D with diagD
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			D[i][j] = (i==j)? sqrt(diagD[i]): 0.f;	
+		}	
+	}
+
+	float **U_t; // transpose of U
+	U_t = (float**)malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		U_t[i] = (float*)malloc(sizeof(float)*n);
+	}
+
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			U_t[j][i] = U[i][j];
+		}	
+	}
+
+	// matrix multiplication
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			tmp = 0.0;	
+			for(k=0;k<n;++k){
+				tmp += D[i][k]*U_t[k][j];
+			}
+			C[i][j] = tmp;
+		}	
+	}
+
+
+	// release
+	for(i=0;i<n;++i){
+		free(x[i]);
+		free(u[i]);
+		free(D[i]);
+		free(U[i]);
+		free(U_t[i]);
+	}
+	free(x);
+	free(u);
+	free(D);
+	free(U);
+	free(U_t);
+	free(diagD);
+	free(t);
+
 }
+
+
 
 void pinv_main(float **R, float **R_pinv, unsigned int D)
 {
@@ -854,36 +948,21 @@ void pinv_main(float **R, float **R_pinv, unsigned int D)
 
 	// use singular value decomposition to find pseudo inverse of a matrix
 
-	unsigned int i,j;
+	unsigned int i;
 	unsigned int n = D;
 	float **input;
 	input = R;
 
-	// copy input to U
 	float **U;
 	U = (float**)malloc(sizeof(float*)*n);
 	for(i=0;i<n;++i){
 		U[i] = (float*)malloc(sizeof(float)*n);
 	}
 
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			U[i][j] = input[i][j];
-		}
-	}
-
-	// identity matrix V
-	//eye(5);
 	float **V;
 	V = (float **)malloc(sizeof(float*)*n);
 	for(i=0;i<n;++i){
 		V[i] = (float*)malloc(sizeof(float)*n);
-	}
-
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			V[i][j] = (i==j)? 1.f: 0.f;
-		}
 	}
 
 	// S
@@ -893,11 +972,6 @@ void pinv_main(float **R, float **R_pinv, unsigned int D)
 		S[i] = (float*)malloc(sizeof(float)*n);
 	}
 
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			S[i][j] = 0.f;
-		}
-	}
 
 	// svd
 	svd(input,U,S,V,n);
@@ -952,11 +1026,34 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 	// parameters
 	unsigned int MAX_STEPS = 100;
 	double TOL = 1e-8;
-	unsigned int steps,j,k,ind;
+	unsigned int steps,i,j,k,ind;
 	double converge;
 	double alpha,beta,gamma,zeta;
 	double t,c,s;
 	float tmp;
+
+	// copy input to U
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			U[i][j] = input[i][j];
+		}
+	}
+
+	// identity matrix V
+	//eye(n);
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			V[i][j] = (i==j)? 1.f: 0.f;
+		}
+	}
+
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			S[i][j] = 0.f;
+		}
+	}
+
+
 
 	// debug
 	int ii,jj;
@@ -1236,4 +1333,98 @@ void pinv(float **U, float **S, float **V, unsigned int n, float **X)
 	free(matT);
 }
 
+void ForwardAlgo(float **B, float **A, float *prior, float **alpha, unsigned int N, unsigned int T, float *likelihood)
+{
+	// B 	: NxT
+	// A	: NxN
+	// prior: Nx1
+	// alpha: NxT
 
+	unsigned int i,j,k;
+
+	float *A_al=(float*)malloc(sizeof(float)*N); 
+
+	float **A_t = (float**)malloc(sizeof(float*)*N);
+	for(i=0;i<N;++i){
+		A_t[i] = (float*)malloc(sizeof(float)*N);
+	}
+
+	double tmp;
+	double alpha_sum;
+	double loglikelihood=0.0;
+
+	// ---------------------
+	//	alpha = zeros(N, T);
+	// ---------------------
+	for(i=0;i<N;++i){
+		for(j=0;j<T;++j){
+			alpha[i][j] = 0.f;
+		}
+	}
+
+
+	// populate the probability forward along the time windows T
+	for(i=0;i<T;++T)
+	{
+		if(i==0)
+		{
+			for(j=0;j<N;++j)
+			{
+				alpha[j][i] = B[j][i] * prior[j];
+				// printf("%10e\n",alpha[j*T+i]);
+			}
+
+		}
+		else
+		{
+			// alpha(:, t) = B(:, t) .* (A' * alpha(:, t - 1));
+			transpose(A, A_t, N, N);
+			for(j=0;j<N;++j)
+			{
+				tmp = 0.0;
+				for(k=0;k<N;++k)
+				{
+					tmp += A_t[j][k]*alpha[k][i-1];
+				}
+				A_al[j] = (float)tmp;
+			}
+
+			for(j=0;j<N;++j)
+			{
+				alpha[j][i] = B[j][i] * A_al[j];
+				//if(i==1){
+				//	printf("%10e\n",alpha[j*T+i]);			
+				//}
+			}
+		}	
+
+		// alpha_sum      = sum(alpha(:, t));
+		// alpha(:, t)    = alpha(:, t) ./ alpha_sum; 
+		alpha_sum = 0.0;
+		for(j=0;j<N;++j)
+		{
+			alpha_sum += alpha[j][i];
+		}
+		
+		for(j=0;j<N;++j)
+		{
+			alpha[j][i] /= (float)alpha_sum;
+			//if(i==1 || i==0){
+			//	printf("%10e\n",alpha[j*T+i]);			
+			//}
+		}
+
+		loglikelihood += log(alpha_sum); 
+		
+
+	}
+
+	*likelihood = (float)loglikelihood;
+
+	// release
+	free(A_al);
+	for(i=0;i<N;++i){
+		free(A_t[i]);
+	}
+	free(A_t);
+}

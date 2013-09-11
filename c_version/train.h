@@ -7,15 +7,15 @@
 extern "C"{
 #endif
 
-void Train(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates);
+void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates);
 
 void transpose(float **in, float **out, unsigned int row, unsigned int col);
 
 void cov(float **input, unsigned int R, unsigned int C, float **result);
 
-void chol(float **sigma, unsigned int row, unsigned int col, float **C);
+void cholcov(float **sigma, unsigned int row, unsigned int col, float **C);
 
-void mvnpdf(double **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D);
+void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D);
 
 void LU_pivot(float **R, float *P, unsigned int n);
 
@@ -30,6 +30,8 @@ float norm_square(float **U, unsigned int j, unsigned int rows);
 int sign_d(double x);
 
 void pinv(float **U, float **S, float **V, unsigned int n, float **X);
+
+void ForwardAlgo(float **B, float **A, float *prior, float **alpha, unsigned int N, unsigned int T, float *likelihood);
 
 #ifdef __cplusplus
 }
