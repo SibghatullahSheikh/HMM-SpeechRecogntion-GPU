@@ -31,7 +31,11 @@ int sign_d(double x);
 
 void pinv(float **U, float **S, float **V, unsigned int n, float **X);
 
-void ForwardAlgo(float **B, float **A, float *prior, float **alpha, unsigned int N, unsigned int T, float *likelihood);
+void Forward(float **B, float **A, float *prior, float **alpha, unsigned int N, unsigned int T, float *likelihood);
+
+void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T);
+
+void EM(float **observations, float **A, float **B, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T);
 
 #ifdef __cplusplus
 }

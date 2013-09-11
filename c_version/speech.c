@@ -6,6 +6,7 @@
 
 #include "feature_extraction.c"
 #include "train.c"
+#include "utils.c"
 
 static char *config_file_name="";
 static char *config_nfft="";
