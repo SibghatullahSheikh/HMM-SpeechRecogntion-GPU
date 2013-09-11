@@ -1213,7 +1213,6 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 	free(beta_B);
 }
 
-
 void normalise_2d_f(float **x, unsigned int row, unsigned int col)
 {
 	/*
@@ -1351,16 +1350,17 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 
 
 	unsigned int i,j,k;
+	double tmp;
 
 	// NxN
-	float **xi_sum	= (float**)malloc(sizeof(float)*N);
+	float **xi_sum	= (float**)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
 		xi_sum[i] = (float*)malloc(sizeof(float)*N);
 	}
 	init_2d_f(xi_sum,N,N,0.f);
 
 	// NxT
-	float **gamma= (float**)malloc(sizeof(float)*N);
+	float **gamma= (float**)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
 		gamma[i] = (float*)malloc(sizeof(float)*T);
 	}
@@ -1368,16 +1368,17 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 
 
 	// NxN
-	float **alpha_beta_B = (float**)malloc(sizeof(float)*N);
+	float **alpha_beta_B = (float**)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
 		alpha_beta_B[i] = (float*)malloc(sizeof(float)*N);
 	}
 
 	// NxN
-	float **xi_sum_tmp = (float**)malloc(sizeof(float)*N);
+	float **xi_sum_tmp = (float**)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
 		xi_sum_tmp[i] = (float*)malloc(sizeof(float)*N);
 	}
+
 
 	// Nx1
 	float *gamma_norm = (float*)malloc(sizeof(float)*N);
@@ -1393,7 +1394,7 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	//    gamma(:, t) = normalise(alpha(:, t) .* beta(:, t));
 	//end
 	//---------------------
-	for(i=0;i<=T-1;++i){
+	for(i=0;i<T-1;++i){
 		for(j=0;j<N;++j){
 			beta_B[j] = beta[j][i+1] * B[j][i+1];
 		} 
@@ -1414,18 +1415,18 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		// normalise
 		normalise_2d_f(xi_sum_tmp,N,N);
 
-		if(i<=2){
+		if(i<=2 && 0){
 			printf("\n----------");
 			printf("\ni = %d",i);
 			printf("\n----------");
 			printf("\n");
-			check_2d_f(xi_sum_tmp,N,N);
+			//check_2d_f(xi_sum_tmp,N,N);
 		}
 
 		// update xi_sum
 		for(j=0;j<N;++j){
 			for(k=0;k<N;++k){
-				xi_sum[j][k] += xi_sum_tmp[j][k];
+				xi_sum[j][k] += (float)xi_sum_tmp[j][k];
 			}
 		}
 
@@ -1455,15 +1456,178 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		exp_prior[i] = gamma[i][0];
 	}
 	// NxN
-	float **exp_A=(float**)malloc(sizeof(float)*N);
+	float **exp_A=(float**)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
 		exp_A[i] = (float*)malloc(sizeof(float)*N);
 	}
 
+	//------------------------------------
 	//expected_A     = mk_stochastic(xi_sum);
+	//------------------------------------
 	mk_stochastic_2d_f(xi_sum,N,N,exp_A);
-
 	//check_2d_f(exp_A,N,N);
+
+	//------------------------------------
+	//    expected_mu    = zeros(D, N);
+	//	  expected_Sigma = zeros(D, D, N);
+	//------------------------------------
+	// DxN
+	float **exp_mu=(float**)malloc(sizeof(float*)*D);
+	for(i=0;i<D;++i){
+		exp_mu[i] = (float*)malloc(sizeof(float)*N);
+	}
+
+	// DxDxN
+	float ***exp_sigma;
+	exp_sigma = (float***)malloc(sizeof(float**)*D); // row
+	for(i=0;i<D;++i){
+		exp_sigma[i] = (float**) malloc(sizeof(float*)*D); // col
+		for(j=0;j<D;++j){
+			exp_sigma[i][j] = (float*) malloc(sizeof(float)*N);
+			for(k=0;k<N;++k){
+				exp_sigma[i][j][k] = 0.f;	
+			}
+		}	
+	}
+
+	//------------------------------------
+	//	gamma_state_sum = sum(gamma, 2);
+	//------------------------------------
+	float *gamma_state_sum	= (float*)malloc(sizeof(float)*N); // Nx1
+
+	for(i=0;i<N;++i){
+		tmp = 0.0;
+		for(j=0;j<T;++j)
+		{
+			tmp += gamma[i][j];
+		}
+		//Set any zeroes to one before dividing to avoid NaN
+		if(tmp == 0.0){
+			tmp = 1.0;
+		}
+		gamma_state_sum[i]=(float)tmp;
+	}	
+	puts("gamma_state_sum");
+	check_1d_f(gamma_state_sum,N);
+
+
+	//---------------------------------------------------------------------------------------
+	// matlab:
+	// for s = 1:N
+	//    gamma_observations = observations .* repmat(gamma(s, :), [D 1]);
+	//    expected_mu(:, s)  = sum(gamma_observations, 2) / gamma_state_sum(s); 	%  updated mean
+	//    expected_Sigma(:, :, s) = symmetrize(gamma_observations * observations' / gamma_state_sum(s) - ...
+	//        expected_mu(:, s) * expected_mu(:, s)');	% updated covariance
+	// end
+	//---------------------------------------------------------------------------------------
+
+	// gamma:NxT
+	// observations:TxD (need to think it as DxT to avoid transposing) 
+	// gamma_obs: DxT
+	float **gamma_obs		=(float**)malloc(sizeof(float*)*D); // DxT
+	float **gamma_obs_mul	=(float**)malloc(sizeof(float*)*D); // DxD
+	float **exp_mu_mul		=(float**)malloc(sizeof(float*)*D); // DxD
+	float **obs_div_mu		=(float**)malloc(sizeof(float*)*D); // DxD
+
+	for(i=0;i<D;++i)
+	{
+		gamma_obs[i] 		= (float*)malloc(sizeof(float)*T);
+		gamma_obs_mul[i] 	= (float*)malloc(sizeof(float)*D);
+		exp_mu_mul[i] 		= (float*)malloc(sizeof(float)*D);
+		obs_div_mu[i] 		= (float*)malloc(sizeof(float)*D);
+	}
+
+
+	int offset;
+	int start;
+	int n;
+
+	for(k=0;k<N;k++){
+		//repmat gamma
+		offset = k*T;
+		for(i=0;i<D;i++){ // num of repeats
+			start = i*T;
+			for(j=0;j<T;j++){
+				gamma_obs[start+j]=gamma[j+offset];	
+			}	
+		}
+		// now gamma_obs is DxT
+		// dot multiplication with observations
+		for(i=0;i<D;i++){
+			for(j=0;j<T;j++){
+				gamma_obs[i*T+j] *= observations[j*D+i];	
+			}
+		}
+	//	
+	//	   if(k==0){
+	//	   for(i=0;i<D;i++){
+	//	   printf("gamma_obs,  round %d\n",i+1);
+	//	   for(j=0;j<T;j++){
+	//	   printf("%10lf\n", gamma_obs[i*T+j]);
+	//	   }
+	//	   printf("\n---------------------\n");
+	//	   }
+	//	   }
+	//	 
+
+		//update exp_mu : DxN
+		for(i=0;i<D;i++){
+			tmp=0;
+			for(j=0;j<T;j++){
+				tmp += gamma_obs[i*T+j];	
+			}
+			exp_mu[i*N+k] = tmp/gamma_state_sum[k]; 
+		}
+	
+//		   if(k==0){
+//		   for(i=0;i<D;i++){
+//		   for(j=0;j<N;j++){
+//		   printf("%lf ",exp_mu[i*N+j]);	
+//		   }
+//		   printf("\n");
+//		   }
+//		   }
+//
+
+		// prepare symmetrize
+		// nominator : gamma_obs(DxT)  *  observations (TxD)
+		for(i=0;i<D;i++){ // row
+			for(j=0;j<D;j++){ // col
+				tmp = 0;	
+				for(n=0;n<T;n++){
+					tmp += gamma_obs[i*T+n]*observations[n*D+j];
+				}
+				gamma_obs_mul[i*D+j] = tmp;
+			}
+		}
+//		
+//		   if(k==0){
+//		   for(i=0;i<D;i++){
+//		   for(j=0;j<D;j++){
+//		   printf("%10e ", gamma_obs_mul[i*D+j]);
+//		   }
+//		   printf("\n");
+//		   }
+//
+//		   }
+//		 
+
+		// denominator:
+		for(i=0;i<D;i++){// row
+			for(j=0;j<D;j++){ // col
+				exp_mu_mul[i*D+j] = gamma_state_sum[k] - exp_mu[i*N+k]*exp_mu[j*N+k];
+				if(k==0)	printf("%10e ",exp_mu_mul[i*D+j]);
+			}	
+			if(k==0)	printf("\n");
+		}
+
+		// matrix division:    obs_div_mu = gamma_obs_mul (DxD) /	exp_mu_mul (DxD)
+		matrixDiv(gamma_obs_mul,D,D, exp_mu_mul,D,D, obs_div_mu);
+
+
+
+		// write symmetrize()	
+	}
 
 
 
@@ -1486,6 +1650,31 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	free(exp_prior);
 	free(exp_A);
 
+	for(i=0;i<D;++i){
+		free(exp_mu[i]);
+		free(gamma_obs[i]);
+		free(gamma_obs_mul[i]);
+		free(exp_mu_mul[i]);
+		free(obs_div_mu[i]);
+	}
+	free(exp_mu);
+	// 3D exp_sigma
+	for(i=0;i<D;++i){
+		for(j=0;j<D;++j){
+			free(exp_sigma[i][j]);
+		}
+	}
+	for(i=0;i<D;++i){
+		free(exp_sigma[i]);
+	}
+	free(exp_sigma);
+	free(gamma_state_sum);
+
+	free(gamma_obs);
+	free(gamma_obs_mul);
+	free(exp_mu_mul);
+	free(obs_div_mu);
+
 
 /*
 
@@ -1499,46 +1688,10 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 //	   }	
 //
 
-	double *exp_mu			=(double*)calloc(N*D,sizeof(double));// DxN = 6x3
-	double *exp_sigma		=(double*)calloc(N*D*D,sizeof(double));
-	double *gamma_state_sum	=(double*)calloc(N,sizeof(double)); // Nx1
-
-	//gamma_state_sum = sum(gamma, 2);
-	for(i=0;i<N;i++){
-		tmp = 0;
-		for(j=0;j<T;j++){
-			tmp += gamma[i*T+j];
-		}
-		//Set any zeroes to one before dividing to avoid NaN
-		if(tmp==0){
-			tmp = 1;
-		}
-		gamma_state_sum[i]=tmp;
-		//printf("%lf\n",gamma_state_sum[i]);
-	}	
-
-	//---------------------//
-	// matlab:
-	// for s = 1:N
-	//    gamma_observations = observations .* repmat(gamma(s, :), [D 1]);
-	//    expected_mu(:, s)  = sum(gamma_observations, 2) / gamma_state_sum(s); 	%  updated mean
-	//    expected_Sigma(:, :, s) = symmetrize(gamma_observations * observations' / gamma_state_sum(s) - ...
-	//        expected_mu(:, s) * expected_mu(:, s)');	% updated covariance
-	// end
-	//---------------------//
 
 
-	// gamma:NxT
-	// observations:TxD (need to think it as DxT to avoid transposing) 
-	// gamma_obs: DxT
-	double *gamma_obs		=(double*)malloc(sizeof(double)*D*T);
-	double *gamma_obs_mul	=(double*)malloc(sizeof(double)*D*D);
-	double *exp_mu_mul		=(double*)malloc(sizeof(double)*D*D);
-	double *obs_div_mu		=(double*)malloc(sizeof(double)*D*D);
 
-	int offset;
-	int start;
-	int n;
+
 	for(k=0;k<N;k++){
 		//repmat gamma
 		offset = k*T;

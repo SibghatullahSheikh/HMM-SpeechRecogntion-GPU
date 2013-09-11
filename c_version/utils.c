@@ -90,3 +90,13 @@ void check_2d_f(float **array, unsigned int row, unsigned int col)
 }
 
 
+void check_1d_f(float *array, unsigned int len)
+{
+	unsigned int i;
+
+	for(i=0;i<len;++i)
+	{
+		printf("%10.5f \n",array[i]);	
+	}
+
+}

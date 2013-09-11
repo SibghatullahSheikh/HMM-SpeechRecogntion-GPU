@@ -17,6 +17,8 @@ void init_1d_f(float *array, unsigned int N, float val);
 
 void check_2d_f(float **array, unsigned int row, unsigned int col);
 
+void check_1d_f(float *array, unsigned int len);
+
 
 
 
