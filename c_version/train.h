@@ -37,6 +37,14 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 
 void EM(float **observations, float **A, float **B, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T);
 
+void normalise_2d_f(float **x, unsigned int row, unsigned int col);
+
+void normalise_1d_f(float *x, unsigned int len);
+
+void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **out);
+
+
+
 #ifdef __cplusplus
 }
 #endif

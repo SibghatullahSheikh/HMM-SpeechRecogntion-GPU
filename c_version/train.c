@@ -1213,9 +1213,144 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 	free(beta_B);
 }
 
+
+void normalise_2d_f(float **x, unsigned int row, unsigned int col)
+{
+	/*
+	   if(nargin < 2)
+	   z = sum(A(:));
+	   z(z==0) = 1;
+	   A = A./z;
+	   else
+	   z = sum(A, dim);
+	   z(z==0) = 1;
+	   A = bsxfun(@rdivide, A, z);
+	   end
+	 */
+	
+	// sum, columnwise
+	unsigned int i,j;
+	double sum=0.0;
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			sum = sum + x[i][j];
+		}
+	}
+
+	if(sum == 0.0)
+	{
+		printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
+		sum = 1.0;
+	}
+
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			x[i][j] /= (float)sum;
+		}
+	}
+
+}
+
+
+void normalise_1d_f(float *x, unsigned int len)
+{
+	unsigned int i;
+	double sum=0.0;
+	for(i=0;i<len;++i){
+		sum += x[i];
+	}
+
+	if(sum ==0.0)
+	{
+		printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
+		sum = 1.0;
+	}
+
+	for(i=0;i<len;++i){
+		x[i] /= (float)sum;
+	}
+
+}
+
+
+void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **out)
+{
+	//  Z = sum(T,2); 
+	//  S = Z + (Z==0);
+
+	unsigned int i,j;
+
+	float **norm;  // row x col
+	norm=(float **)malloc(sizeof(float*)*row);
+	for(i=0;i<row;++i){
+		norm[i] = (float*)malloc(sizeof(float)*col);	
+	}
+
+	float *Z;
+	Z =(float*)malloc(sizeof(float)*row);
+
+	float *Z1;
+	Z1 =(float*)malloc(sizeof(float)*row);
+	init_1d_f(Z1,row,0.f);
+
+	double sum;
+	// sum across row
+	for(i=0;i<row;++i){
+		sum=0.0;    
+		for(j=0;j<col;++j){
+			sum = sum + x[i][j];
+		}
+		Z[i] = (float)sum;
+	}   
+
+	for(i=0;i<row;++i){
+		if(Z[i]==0){
+			Z1[i]=1.0;  
+		}
+	}
+
+	for(i=0;i<row;++i){
+		Z1[i]=Z1[i]+Z[i];   
+	}
+
+	//  norm = repmat(S, 1, size(T,2));
+	//  norm = [S S .. S]
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			norm[i][j] = Z1[i];  
+		}
+	}   
+
+	//  T = T ./ norm;
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			out[i][j] = x[i][j]/norm[i][j];    
+		}
+	}   
+
+	// release
+	for(i=0;i<row;++i){
+		free(norm[i]);
+	}
+	free(norm);
+	free(Z);
+	free(Z1);
+}
+
+
+
 void EM(float **observations, float **A, float **B, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T)
 {
-	unsigned int i,j;
+	//-------------------------
+	// observations: DxT
+	// A : NxN
+	// B : NxT
+	// alpha:  NxT
+	// beta :  NxT
+	//-------------------------
+
+
+	unsigned int i,j,k;
 
 	// NxN
 	float **xi_sum	= (float**)malloc(sizeof(float)*N);
@@ -1246,91 +1381,115 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 
 	// Nx1
 	float *gamma_norm = (float*)malloc(sizeof(float)*N);
+	float *beta_B = (float*)malloc(sizeof(float)*N);
 
 
-/*
-
-
-
+	//------------------------------------//
+	//	E-step
+	//------------------------------------//
 	//---------------------
 	//for t = 1:(T - 1)
 	//    xi_sum      = xi_sum + normalise(A .* (alpha(:, t) * (beta(:, t + 1) .* B(:, t + 1))'));
 	//    gamma(:, t) = normalise(alpha(:, t) .* beta(:, t));
 	//end
 	//---------------------
-	for(i=0;i<T-1;i++){
-		for(j=0;j<N;j++){
-			beta_B[j] = beta[j*T+i+1] * B[j*T+i+1];
-		} // 1xN 
+	for(i=0;i<=T-1;++i){
+		for(j=0;j<N;++j){
+			beta_B[j] = beta[j][i+1] * B[j][i+1];
+		} 
+
 		// alpha: NxT
-		for(j=0;j<N;j++){
-			for(k=0;k<N;k++){
-				alpha_beta_B[j*N+k]= alpha[j*T+i]*beta_B[k];			
+		for(j=0;j<N;++j){
+			for(k=0;k<N;++k){
+				alpha_beta_B[j][k]= alpha[j][i]*beta_B[k];			
 			}
 		}
 		// A.*alpha_beta_B
-		for(j=0;j<N;j++){
-			for(k=0;k<N;k++){
-				xi_sum_tmp[j*N+k]=A[j*N+k]*alpha_beta_B[j*N+k];
-			}
-		}
-		// normalise
-		normalise(xi_sum_tmp,N,N);
-		// update xi_sum
-		for(j=0;j<N;j++){
-			for(k=0;k<N;k++){
-				xi_sum[j*N+k] += xi_sum_tmp[j*N+k];
+		for(j=0;j<N;++j){
+			for(k=0;k<N;++k){
+				xi_sum_tmp[j][k] = A[j][k]*alpha_beta_B[j][k];
 			}
 		}
 
-		for(j=0;j<N;j++){
-			gamma_norm[j] = alpha[j*T+i] * beta[j*T+i];
+		// normalise
+		normalise_2d_f(xi_sum_tmp,N,N);
+
+		if(i<=2){
+			printf("\n----------");
+			printf("\ni = %d",i);
+			printf("\n----------");
+			printf("\n");
+			check_2d_f(xi_sum_tmp,N,N);
+		}
+
+		// update xi_sum
+		for(j=0;j<N;++j){
+			for(k=0;k<N;++k){
+				xi_sum[j][k] += xi_sum_tmp[j][k];
+			}
+		}
+
+		// alpha * beta
+		for(j=0;j<N;++j){
+			gamma_norm[j] = alpha[j][i] * beta[j][i];
 		} // Nx1 
-		normalise(gamma_norm,N,1);
-		for(j=0;j<N;j++){
-			gamma[j*T+i]= gamma_norm[j];
+
+		normalise_1d_f(gamma_norm,N);
+
+		// update gamma after normalisation
+		for(j=0;j<N;++j){
+			gamma[j][i]= gamma_norm[j];
 		} 
 	}
-	// gamma(:, T) = normalise(alpha(:, T) .* beta(:, T));
-	for(j=0;j<N;j++){
-		gamma_norm[j] = alpha[j*T+T-1] * beta[j*T+T-1];
+
+	//check_2d_f(gamma,N,T);
+
+
+
+
+	//------------------------------------//
+	//	M-step
+	//------------------------------------//
+	float *exp_prior=(float*)malloc(sizeof(float)*N); // Nx1
+	for(i=0;i<N;++i){
+		exp_prior[i] = gamma[i][0];
 	}
-	normalise(gamma_norm,N,1);
-	for(j=0;j<N;j++){
-		gamma[j*T+T-1]= gamma_norm[j];
-	} 
-
-//
-//	   printf("xi_sum=\n");
-//	   for(j=0;j<N;j++){
-//	   for(k=0;k<N;k++){
-//	   printf("%10lf ",xi_sum[j*N+k]);	
-//	   }
-//	   printf("\n");
-//	   }
-//
-//	   printf("gamma=\n");
-//	   for(i=0;i<N;i++){
-//	   printf("N=%d\n",i+1);
-//	   for(j=0;j<T;j++){
-//	   printf("%lf\n",gamma[i*T+j]);
-//	   }	
-//	   printf("\n-----------------\n");
-//	   }
-//
-
-
-	//------------------------------------------------------------// 
-	//	output parameters
-	//------------------------------------------------------------// 
-	double *exp_prior=(double*)malloc(sizeof(double)*N); // Nx1
-	for(i=0;i<N;i++){
-		exp_prior[i] = gamma[i*T];
-		//printf("%lf\n",exp_prior[i]);
+	// NxN
+	float **exp_A=(float**)malloc(sizeof(float)*N);
+	for(i=0;i<N;++i){
+		exp_A[i] = (float*)malloc(sizeof(float)*N);
 	}
 
-	double *exp_A=(double*)malloc(sizeof(double)*N*N); // NxN
-	mk_stochastic(xi_sum,N,N,exp_A);
+	//expected_A     = mk_stochastic(xi_sum);
+	mk_stochastic_2d_f(xi_sum,N,N,exp_A);
+
+	//check_2d_f(exp_A,N,N);
+
+
+
+
+	// release
+	for(i=0;i<N;++i){
+		free(xi_sum[i]);
+		free(gamma[i]);
+		free(alpha_beta_B[i]);
+		free(xi_sum_tmp[i]);
+		free(exp_A[i]);
+	}
+	free(xi_sum);
+	free(gamma);
+	free(alpha_beta_B);
+	free(xi_sum_tmp);
+	free(gamma_norm);
+	free(beta_B);
+
+	free(exp_prior);
+	free(exp_A);
+
+
+/*
+
+
 //	
 //	   for(i=0;i<N;i++){
 //	   for(j=0;j<N;j++){
@@ -1468,12 +1627,11 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	}
 
 */
-	// release
-	for(i=0;i<N;++i){
-		free(xi_sum[i]);
-		free(gamma[i]);
-	}
-	free(xi_sum);
-	free(gamma);
 
 }
+
+
+
+
+
+
