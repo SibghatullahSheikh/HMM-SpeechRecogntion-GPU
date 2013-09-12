@@ -72,6 +72,26 @@ void init_1d_f(float *array, unsigned int N, float val)
 	}
 }
 
+void check_3d_f(float ***array, unsigned int row, unsigned int col, unsigned int N)
+{
+	unsigned int i,j,k;
+
+	for(k=0;k<N;++k)
+	{
+		printf("[][][%d] = \n",k);
+		for(i=0;i<row;++i)
+		{
+			for(j=0;j<col;++j)
+			{
+				printf("%10.5f ",array[i][j][k]);	
+
+			}
+			printf("\n");
+		}
+	}
+
+}
+
 void check_2d_f(float **array, unsigned int row, unsigned int col)
 {
 	unsigned int i,j;
@@ -100,3 +120,39 @@ void check_1d_f(float *array, unsigned int len)
 	}
 
 }
+
+
+void transpose(float **in, float **out, unsigned int row, unsigned int col)
+{
+	unsigned int i,j;
+	for(i=0;i<row;++i)
+	{
+		for(j=0;j<col;++j)
+		{
+			out[j][i] = in[i][j];
+		}
+	}
+}
+
+
+void symmetrize_f(float **in, unsigned int N)
+{
+	unsigned int i,j;
+	for(i=0;i<N;++i){
+		for(j=0;j<i;++j){
+			// compare (i,j) with (j,i)
+			if(in[i][j]<in[j][i]){
+				in[i][j] = in[j][i];
+			}else{
+				in[j][i] = in[i][j];
+			}
+		}
+	}
+
+
+
+}
+
+
+
+

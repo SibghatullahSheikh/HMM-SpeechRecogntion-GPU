@@ -268,19 +268,6 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 }
 
-void transpose(float **in, float **out, unsigned int row, unsigned int col)
-{
-	unsigned int i,j;
-	for(i=0;i<row;++i)
-	{
-		for(j=0;j<col;++j)
-		{
-			out[j][i] = in[i][j];	
-		}
-	}
-}
-
-
 
 void cov(float **input, unsigned int R, unsigned int C, float **result)
 {
@@ -1549,10 +1536,24 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		exp_mu[i] = (float*)malloc(sizeof(float)*N);
 	}
 
+	// TxD
+	float **observations_t=(float**)malloc(sizeof(float*)*T);
+	for(i=0;i<T;++i){
+		observations_t[i] = (float*)malloc(sizeof(float)*D);
+	}
+	transpose(observations, observations_t,D,T);
+
+	// DxD
+	float **gammaob_ob_t=(float**)malloc(sizeof(float*)*D);
+	for(i=0;i<D;++i){
+		gammaob_ob_t[i] = (float*)malloc(sizeof(float)*D);
+	}
+
+
 
 	//unsigned int offset;
 	//unsigned int start;
-	//unsigned int n;
+	unsigned int n;
 
 	for(k=0;k<N;++k)
 	{
@@ -1574,51 +1575,80 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 				gamma_obs[i][j] *= observations[i][j];	
 			}
 		}
+		if(k==0 && 0){check_2d_f(gamma_obs,D,T);}
 
-		if(k==0 && 1){
-			check_2d_f(gamma_obs,D,T);
-		}
-
-/*
-		//update exp_mu : DxN
 		for(i=0;i<D;++i){
 			tmp=0.0;
 			for(j=0;j<T;++j){
 				tmp += gamma_obs[i][j];	
 			}
-			exp_mu[i][k] = tmp/gamma_state_sum[k]; 
+			exp_mu[i][k] = (float)tmp/gamma_state_sum[k]; 
 		}
-	
+		if(k==0 && 0){check_2d_f(exp_mu,D,N);}
 
-		// prepare symmetrize
-		// nominator : gamma_obs(DxT)  *  observations (TxD)
-		for(i=0;i<D;i++){ // row
-			for(j=0;j<D;j++){ // col
-				tmp = 0;	
-				for(n=0;n<T;n++){
-					tmp += gamma_obs[i*T+n]*observations[n*D+j];
+		// gamma_obs(DxT)  *  observations_t (TxD)
+		for(i=0;i<D;++i){ // row
+			for(j=0;j<D;++j){ // col
+				tmp = 0.0;	
+				for(n=0;n<T;++n){
+					tmp += gamma_obs[i][n]*observations_t[n][j];
 				}
-				gamma_obs_mul[i*D+j] = tmp;
+				gammaob_ob_t[i][j] = (float)tmp;
+			}
+		}
+		if(k==0 && 0){check_2d_f(gammaob_ob_t,D,D);}
+
+		for(i=0;i<D;++i){ // row
+			for(j=0;j<D;++j){ // col
+				gammaob_ob_t[i][j] /= gamma_state_sum[k];
 			}
 		}
 
-		// denominator:
-		for(i=0;i<D;i++){// row
-			for(j=0;j<D;j++){ // col
-				exp_mu_mul[i*D+j] = gamma_state_sum[k] - exp_mu[i*N+k]*exp_mu[j*N+k];
-				if(k==0)	printf("%10e ",exp_mu_mul[i*D+j]);
-			}	
-			if(k==0)	printf("\n");
+
+
+		for(i=0;i<D;++i){// row
+			for(j=0;j<D;++j){ // col
+				exp_mu_mul[i][j] = exp_mu[i][k] * exp_mu[j][k];
+			}
+		}
+		if(k==0 && 0){check_2d_f(exp_mu_mul,D,D);}
+
+		// gammaob_bo_t  - exp_mu_mul
+		for(i=0;i<D;++i){// row
+			for(j=0;j<D;++j){ // col
+				gammaob_ob_t[i][j] -= exp_mu_mul[i][j];
+			}
+		}
+		if(k==0 && 0){check_2d_f(gammaob_ob_t,D,D);}
+
+		// symmetrize()	
+		symmetrize_f(gammaob_ob_t,D);
+		if(k==0 && 0){check_2d_f(gammaob_ob_t,D,D);}
+
+		// save to exp_sigma
+		for(i=0;i<D;++i){// row
+			for(j=0;j<D;++j){ // col
+				exp_sigma[i][j][k] = gammaob_ob_t[i][j];
+			}
 		}
 
-		// matrix division:    obs_div_mu = gamma_obs_mul (DxD) /	exp_mu_mul (DxD)
-		matrixDiv(gamma_obs_mul,D,D, exp_mu_mul,D,D, obs_div_mu);
-
-
-		// write symmetrize()	
-
-*/
 	}
+
+	// check_3d_f(exp_sigma,D,D,N);
+
+	// % Ninja trick to ensure positive semidefiniteness
+	for(k=0;k<N;++k)
+	{
+		for(i=0;i<D;++i)
+		{
+			for(j=0;j<D;++j)
+			{
+				if(i==j)	exp_sigma[i][j][k] += 0.01;
+			}
+		}
+	}
+
+
 
 
 
@@ -1646,6 +1676,7 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		free(gamma_obs_mul[i]);
 		free(exp_mu_mul[i]);
 		free(obs_div_mu[i]);
+		free(gammaob_ob_t[i]);
 	}
 	free(exp_mu);
 	// 3D exp_sigma
@@ -1664,6 +1695,12 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	free(gamma_obs_mul);
 	free(exp_mu_mul);
 	free(obs_div_mu);
+
+	for(i=0;i<T;++i){
+		free(observations_t[i]);
+	}
+	free(observations_t);
+	free(gammaob_ob_t);
 
 
 /*
