@@ -1394,8 +1394,10 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	//    gamma(:, t) = normalise(alpha(:, t) .* beta(:, t));
 	//end
 	//---------------------
-	for(i=0;i<T-1;++i){
-		for(j=0;j<N;++j){
+	for(i=0;i<T-1;++i)
+	{
+		for(j=0;j<N;++j)
+		{
 			beta_B[j] = beta[j][i+1] * B[j][i+1];
 		} 
 
@@ -1443,7 +1445,17 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		} 
 	}
 
-	//check_2d_f(gamma,N,T);
+	// gamma(:, T) = normalise(alpha(:, T) .* beta(:, T));
+	for(j=0;j<N;++j){
+		gamma_norm[j] = alpha[j][T-1] * beta[j][T-1];
+	} 
+	normalise_1d_f(gamma_norm,N);
+	for(j=0;j<N;++j){
+		gamma[j][T-1]= gamma_norm[j];
+	} 
+
+
+	// check_2d_f(gamma,N,T);
 
 
 
@@ -1471,12 +1483,6 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	//    expected_mu    = zeros(D, N);
 	//	  expected_Sigma = zeros(D, D, N);
 	//------------------------------------
-	// DxN
-	float **exp_mu=(float**)malloc(sizeof(float*)*D);
-	for(i=0;i<D;++i){
-		exp_mu[i] = (float*)malloc(sizeof(float)*N);
-	}
-
 	// DxDxN
 	float ***exp_sigma;
 	exp_sigma = (float***)malloc(sizeof(float**)*D); // row
@@ -1537,57 +1543,52 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		obs_div_mu[i] 		= (float*)malloc(sizeof(float)*D);
 	}
 
+	// DxN
+	float **exp_mu=(float**)malloc(sizeof(float*)*D);
+	for(i=0;i<D;++i){
+		exp_mu[i] = (float*)malloc(sizeof(float)*N);
+	}
 
-	int offset;
-	int start;
-	int n;
 
-	for(k=0;k<N;k++){
+	//unsigned int offset;
+	//unsigned int start;
+	//unsigned int n;
+
+	for(k=0;k<N;++k)
+	{
+
 		//repmat gamma
-		offset = k*T;
-		for(i=0;i<D;i++){ // num of repeats
-			start = i*T;
-			for(j=0;j<T;j++){
-				gamma_obs[start+j]=gamma[j+offset];	
+		//offset = k*T;
+		//start = i*T;
+
+		for(i=0;i<D;++i){ // num of repeats
+			for(j=0;j<T;++j){
+				gamma_obs[i][j]=gamma[k][j];	
 			}	
 		}
+
 		// now gamma_obs is DxT
 		// dot multiplication with observations
-		for(i=0;i<D;i++){
-			for(j=0;j<T;j++){
-				gamma_obs[i*T+j] *= observations[j*D+i];	
+		for(i=0;i<D;++i){
+			for(j=0;j<T;++j){
+				gamma_obs[i][j] *= observations[i][j];	
 			}
 		}
-	//	
-	//	   if(k==0){
-	//	   for(i=0;i<D;i++){
-	//	   printf("gamma_obs,  round %d\n",i+1);
-	//	   for(j=0;j<T;j++){
-	//	   printf("%10lf\n", gamma_obs[i*T+j]);
-	//	   }
-	//	   printf("\n---------------------\n");
-	//	   }
-	//	   }
-	//	 
 
+		if(k==0 && 1){
+			check_2d_f(gamma_obs,D,T);
+		}
+
+/*
 		//update exp_mu : DxN
-		for(i=0;i<D;i++){
-			tmp=0;
-			for(j=0;j<T;j++){
-				tmp += gamma_obs[i*T+j];	
+		for(i=0;i<D;++i){
+			tmp=0.0;
+			for(j=0;j<T;++j){
+				tmp += gamma_obs[i][j];	
 			}
-			exp_mu[i*N+k] = tmp/gamma_state_sum[k]; 
+			exp_mu[i][k] = tmp/gamma_state_sum[k]; 
 		}
 	
-//		   if(k==0){
-//		   for(i=0;i<D;i++){
-//		   for(j=0;j<N;j++){
-//		   printf("%lf ",exp_mu[i*N+j]);	
-//		   }
-//		   printf("\n");
-//		   }
-//		   }
-//
 
 		// prepare symmetrize
 		// nominator : gamma_obs(DxT)  *  observations (TxD)
@@ -1600,17 +1601,6 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 				gamma_obs_mul[i*D+j] = tmp;
 			}
 		}
-//		
-//		   if(k==0){
-//		   for(i=0;i<D;i++){
-//		   for(j=0;j<D;j++){
-//		   printf("%10e ", gamma_obs_mul[i*D+j]);
-//		   }
-//		   printf("\n");
-//		   }
-//
-//		   }
-//		 
 
 		// denominator:
 		for(i=0;i<D;i++){// row
@@ -1625,10 +1615,10 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		matrixDiv(gamma_obs_mul,D,D, exp_mu_mul,D,D, obs_div_mu);
 
 
-
 		// write symmetrize()	
-	}
 
+*/
+	}
 
 
 
