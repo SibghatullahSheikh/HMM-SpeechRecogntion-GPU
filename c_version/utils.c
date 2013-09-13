@@ -148,11 +148,6 @@ void symmetrize_f(float **in, unsigned int N)
 			}
 		}
 	}
-
-
-
 }
-
-
 
 

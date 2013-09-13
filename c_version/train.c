@@ -8,6 +8,7 @@
 #define PI  M_PI    /* pi to machine precision, defined in math.h */
 #define TWOPI   (2.0*PI)
 #define MAX(a,b) ((a) > (b) ? a : b)
+#define PP() printf("FILE: %s, LINE: %d\n",__FILE__,__LINE__) // print position
 
 
 void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates)
@@ -61,10 +62,13 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 		mu[i] = (float*)malloc(sizeof(float)*N);
 	}
 
-	for(i=0;i<15;++i)
-	{
+	unsigned int loopID;
 
-		if(i==0) // initialize parameters
+	for(loopID=0;loopID<15;++loopID)
+	{
+		printf("loop = %d\n", loopID);
+
+		if(loopID==0) // initialize parameters
 		{
 			prior[0] = 0.555826367548231;
 			prior[1] = 0.384816327750085;
@@ -118,8 +122,19 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 			//	word.T = frameNum; 
 		
 		}
+
 		// pass reference	
-		train_sample(observations, observations_t, prior,A,Sigma,mu,N,D,T);
+		train_sample(observations, observations_t, prior,A,Sigma,mu,N,D,T,loopID);
+
+		if(loopID==0 && 0){
+			
+			check_2d_f(mu,D,N);	
+			//check_1d_f(prior,N);	
+			//check_2d_f(A,N,N);	
+			//check_3d_f(Sigma,D,D,N);	
+			//exit(1);
+		}
+
 	}	
 
 	// save HMM()
@@ -158,7 +173,7 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 }
 
 
-void train_sample(float **observations, float **observations_t,float*prior, float **A, float ***Sigma,float**mu, unsigned int N, unsigned int D, unsigned int T)
+void train_sample(float **observations, float **observations_t,float*prior, float **A, float ***Sigma,float**mu, unsigned int N, unsigned int D, unsigned int T, unsigned int loopID)
 {
 
 	unsigned int i;
@@ -169,6 +184,16 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 	}
 	
 	transpose(mu, mu_t, D, N);
+
+	if(loopID == 1 && 0){
+		check_2d_f(mu,D,N);	
+
+		puts("transpose");
+		check_2d_f(mu_t,N,D);	
+		exit(1);
+	}
+
+
 
 	//for s = 1:N
 	//	B(s, :) = mvnpdf(observations', mu(:, s)', Sigma(:, :, s));
@@ -181,7 +206,18 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 		B[i] = (float*)malloc(sizeof(float)*T);
 	}
 
-	mvnpdf(B,observations_t, mu_t,Sigma,N,T,D); 
+	if(loopID == 1 && 0){
+		check_2d_f(observations_t,T,D);	
+		PP();
+		exit(1);
+	}
+
+	mvnpdf(B,observations_t, mu_t,Sigma,N,T,D,loopID); 
+
+	if(loopID == 1 && 0){
+		check_2d_f(B,N,T);	
+		exit(1);
+	}
 
 //	for(i=0;i<N;++i){
 //		printf("N=%d \n", i+1);
@@ -278,7 +314,7 @@ void cov(float **input, unsigned int R, unsigned int C, float **result)
 }
 
 // 85x6, 1x6 , 6x6
-void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D)
+void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID)
 {
 	// out:	NxT
 	// obs: TxD

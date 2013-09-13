@@ -22,7 +22,7 @@ typedef struct
 
 void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates);
 
-void train_sample(float **observations, float **observations_t, float*prior, float **A, float ***Sigma,float**mu, unsigned int N, unsigned int D, unsigned int T);
+void train_sample(float **observations, float **observations_t, float*prior, float **A, float ***Sigma,float**mu, unsigned int N, unsigned int D, unsigned int T, unsigned int loopID);
 
 void transpose(float **in, float **out, unsigned int row, unsigned int col);
 
@@ -30,7 +30,7 @@ void cov(float **input, unsigned int R, unsigned int C, float **result);
 
 void cholcov(float **sigma, unsigned int row, unsigned int col, float **C);
 
-void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D);
+void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID);
 
 void LU_pivot(float **R, float *P, unsigned int n);
 
