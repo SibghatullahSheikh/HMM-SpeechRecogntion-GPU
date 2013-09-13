@@ -9,6 +9,7 @@
 #define TWOPI   (2.0*PI)
 #define MAX(a,b) ((a) > (b) ? a : b)
 
+
 void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates)
 {
 	// observations[D][T]
@@ -20,16 +21,6 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 	// %prior = normalise(rand(N, 1));
 	float *prior = (float*) malloc(sizeof(float)*N);
-	prior[0] = 0.555826367548231;
-	prior[1] = 0.384816327750085;
-	prior[2] = 0.0593573047016839;
-
-//	for(i=0;i<N;++i)
-//	{
-//		printf("prior[%d]=%f \t", i, prior[i]);
-//	}
-//	printf("\n\n");
-//
 
 	//%A = mk_stochastic(rand(N));
 	float **A = (float**) malloc(sizeof(float*)*N);
@@ -37,48 +28,6 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 	{
 		A[i] = (float*) malloc(sizeof(float)*N);
 	}
-
-	A[0][0]=0.126558246942481;
-	A[0][1]=0.438475341086527;
-	A[0][2]=0.434966411970992;
-	A[1][0]=0.459614415425850;
-	A[1][1]=0.132462410695470;
-	A[1][2]=0.407923173878680;
-	A[2][0]=0.350943345583750;
-	A[2][1]=0.355739578481455;
-	A[2][2]=0.293317075934795;
-
-//	for(i=0;i<N;++i)
-//	{
-//		for(j=0;j<N;++j)
-//		{
-//			printf("A[%d][%d]=%f\t",i,j,A[i][j]);	
-//		}
-//		printf("\n");
-//	}
-//
-
-	//---------------------------------------------------------
-	// Sigma = repmat(diag(diag(cov(observations'))), [1 1 N]);
-	//---------------------------------------------------------
-
-	// find transposition of observation(dxt)
-	float **observations_t= (float**)malloc(sizeof(float*)*T);
-	for(i=0;i<T;++i)
-	{
-		observations_t[i] = (float*)malloc(sizeof(float)*D);
-	}
-	
-	transpose(observations, observations_t, D, T);
-
-//	for(i=0;i<T;++i){
-//		for(j=0;j<D;++j){
-//			printf("%0.7f\t",observations_t[i][j]);
-//		}
-//		printf("\n");
-//	}		   
-//
-
 
 	float **diag_diag_cov = (float**)malloc(sizeof(float*)*D);
 	for(i=0;i<D;++i)
@@ -88,26 +37,11 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 	//init_2d_f(diag_diag_cov,D,D,0.f);
 
-	// in 	TxD 
-    // out	DxD
-	cov(observations_t,T,D,diag_diag_cov);
-
-	// clear the off-diagonal elements
-	for(i=0;i<D;i++){
-		for(j=0;j<D;j++){
-			if(i!=j){
-				diag_diag_cov[i][j]=0.f;	
-			}
-		}
-	}		   
-
-//	for(i=0;i<D;++i){
-//		for(j=0;j<D;++j){
-//			printf("%0.4e ",diag_diag_cov[i][j]);
-//		}
-//		printf("\n");
-//	}		   
-
+	// Sigma = repmat(diag(diag(cov(observations'))), [1 1 N]);
+	float **observations_t= (float**)malloc(sizeof(float*)*T);
+	for(i=0;i<T;++i){
+		observations_t[i] = (float*)malloc(sizeof(float)*D);
+	}
 
 	// Sigma = repmat(diag_diag_cov,D,D,N); // repeat (DxD) N times
 	float ***Sigma;
@@ -122,48 +56,119 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 		}	
 	}
 
-	for(i=0;i<D;++i){
-		for(j=0;j<D;++j){
-			for(k=0;k<N;++k){
-				Sigma[i][j][k] = diag_diag_cov[i][j];	
-			}
-		}	
-	}
-
-//	for(k=0;k<N;++k){
-//		printf("N=%d\n",k+1);
-//		for(i=0;i<D;++i){
-//			for(j=0;j<D;++j){
-//				printf("%.5e ",Sigma[i][j][k]);	
-//			}
-//			printf("\n");
-//		}	
-//		printf("\n");
-//	}
-//
-
-	// mu = observations(:, ind(1:N));   % initialize the mean value
-	// DxN
 	float **mu= (float**)malloc(sizeof(float*)*D);
 	for(i=0;i<D;++i){
 		mu[i] = (float*)malloc(sizeof(float)*N);
 	}
-	
-	mu[0][0]=875;		mu[0][1]=1000;		mu[0][2]=687.5;						
-	mu[1][0]=562.5;		mu[1][1]=1562.5;	mu[1][2]=875;	
-	mu[2][0]=187.5;		mu[2][1]=750;		mu[2][2]=562.5;		
-	mu[3][0]=1375; 		mu[3][1]=875;		mu[3][2]=1562.5;	
-	mu[4][0]=1187.5;	mu[4][1]=1437.5;	mu[4][2]=1062.5; 	
-	mu[5][0]=1625;		mu[5][1]=1187.5;	mu[5][2]=1250;
-	
-	
+
+	for(i=0;i<15;++i)
+	{
+
+		if(i==0) // initialize parameters
+		{
+			prior[0] = 0.555826367548231;
+			prior[1] = 0.384816327750085;
+			prior[2] = 0.0593573047016839;
+			
+			A[0][0]=0.126558246942481;
+			A[0][1]=0.438475341086527;
+			A[0][2]=0.434966411970992;
+			A[1][0]=0.459614415425850;
+			A[1][1]=0.132462410695470;
+			A[1][2]=0.407923173878680;
+			A[2][0]=0.350943345583750;
+			A[2][1]=0.355739578481455;
+			A[2][2]=0.293317075934795;
+
+			transpose(observations, observations_t, D, T);
+			// in 	TxD 
+			// out	DxD
+			cov(observations_t,T,D,diag_diag_cov);
+			// clear the off-diagonal elements
+			for(i=0;i<D;i++){
+				for(j=0;j<D;j++){
+					if(i!=j){
+						diag_diag_cov[i][j]=0.f;	
+					}
+				}
+			}		   
+
+			for(i=0;i<D;++i){
+				for(j=0;j<D;++j){
+					for(k=0;k<N;++k){
+						Sigma[i][j][k] = diag_diag_cov[i][j];	
+					}
+				}	
+			}
+
+			mu[0][0]=875;		mu[0][1]=1000;		mu[0][2]=687.5;						
+			mu[1][0]=562.5;		mu[1][1]=1562.5;	mu[1][2]=875;	
+			mu[2][0]=187.5;		mu[2][1]=750;		mu[2][2]=562.5;		
+			mu[3][0]=1375; 		mu[3][1]=875;		mu[3][2]=1562.5;	
+			mu[4][0]=1187.5;	mu[4][1]=1437.5;	mu[4][2]=1062.5; 	
+			mu[5][0]=1625;		mu[5][1]=1187.5;	mu[5][2]=1250;
+
+			//  word.name="apple01";
+			//	word.prior = prior;			
+			//	word.A = A;
+			//	word.sigma = Sigma;
+			//	word.mu = mu;
+			//	word.N = hiddenstates; 
+			//	word.D = featureDim; 
+			//	word.T = frameNum; 
+		
+		}
+		// pass reference	
+		train_sample(observations, observations_t, prior,A,Sigma,mu,N,D,T);
+	}	
+
+	// save HMM()
+
+
+
+
+
+	// release
+	free(prior);
+	for(i=0;i<N;++i){
+		free(A[i]);
+	}
+	for(i=0;i<T;++i){
+		free(observations_t[i]);
+	}
+	for(i=0;i<D;++i){
+		free(diag_diag_cov[i]);
+		free(mu[i]);
+	}
+	// 3D sigma
+	for(i=0;i<D;++i){
+		for(j=0;j<D;++j){
+			free(Sigma[i][j]);
+		}
+	}
+	for(i=0;i<D;++i){
+		free(Sigma[i]);
+	}
+
+	free(A);
+	free(observations_t);
+	free(diag_diag_cov);
+	free(Sigma);
+	free(mu);
+}
+
+
+void train_sample(float **observations, float **observations_t,float*prior, float **A, float ***Sigma,float**mu, unsigned int N, unsigned int D, unsigned int T)
+{
+
+	unsigned int i;
+
 	float **mu_t= (float**)malloc(sizeof(float*)*N);
 	for(i=0;i<N;++i){
 		mu_t[i] = (float*)malloc(sizeof(float)*D);
 	}
 	
 	transpose(mu, mu_t, D, N);
-
 
 	//for s = 1:N
 	//	B(s, :) = mvnpdf(observations', mu(:, s)', Sigma(:, :, s));
@@ -204,6 +209,7 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 
 
+	
 
 	//---------------------------------------------------------------//
 	//						backward algorithm
@@ -221,53 +227,22 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 	//---------------------------------------------------------------//
 	//						Expectation-Maximization 
 	//---------------------------------------------------------------//
-	EM(observations,A,B,alpha,beta,D,N,T);
+	EM(observations,prior,A,mu,B,Sigma,alpha,beta,D,N,T);
 
 
 
-	//---------
 	// release
-	//---------
-	free(prior);
 	for(i=0;i<N;++i){
-		free(A[i]);
 		free(mu_t[i]);
 		free(B[i]);
 		free(alpha[i]);
 		free(beta[i]);
 	}
-	for(i=0;i<T;++i){
-		free(observations_t[i]);
-	}
-	for(i=0;i<D;++i){
-		free(diag_diag_cov[i]);
-		free(mu[i]);
-	}
-	// 3D sigma
-	for(i=0;i<D;++i){
-		for(j=0;j<D;++j){
-			free(Sigma[i][j]);
-		}
-	}
-	for(i=0;i<D;++i){
-		free(Sigma[i]);
-	}
-
-	free(A);
-	free(observations_t);
-	free(diag_diag_cov);
-	free(Sigma);
-	free(mu);
+	free(mu_t);
 	free(B);
 	free(alpha);
 	free(beta);
-
-	exit(1);
-	
-
-
 }
-
 
 void cov(float **input, unsigned int R, unsigned int C, float **result)
 {
@@ -993,7 +968,7 @@ void pinv(float **U, float **S, float **V, unsigned int n, float **X)
 		printf("Warning: the pinv() output will be zeros.\n file:%s, line:%d",__FILE__,__LINE__);
 		for(i=0;i<n;++i){
 			for(j=0;j<n;++j){
-				X[i][j] = 0.0;	
+				X[i][j] = 1e-7;	
 			}
 		}
 	}else{
@@ -1070,8 +1045,6 @@ void Forward(float **B, float **A, float *prior, float **alpha, unsigned int N, 
 			alpha[i][j] = 0.f;
 		}
 	}
-
-	printf("T = %d\n", T);
 
 	// populate the probability forward along the time windows T
 	for(i=0;i<T;++i)
@@ -1325,7 +1298,7 @@ void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **o
 
 
 
-void EM(float **observations, float **A, float **B, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T)
+void EM(float **observations, float *prior, float **A, float **mu, float **B, float ***Sigma, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T)
 {
 	//-------------------------
 	// observations: DxT
@@ -1500,8 +1473,8 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 		}
 		gamma_state_sum[i]=(float)tmp;
 	}	
-	puts("gamma_state_sum");
-	check_1d_f(gamma_state_sum,N);
+	// puts("gamma_state_sum");
+	//check_1d_f(gamma_state_sum,N);
 
 
 	//---------------------------------------------------------------------------------------
@@ -1649,7 +1622,33 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	}
 
 
+	// update: this is important
+	//prior = expected_prior;
+	for(i=0;i<N;++i){
+		prior[i] = exp_prior[i];
+	}
+    // A     = expected_A;
+	for(i=0;i<N;++i){
+		for(j=0;j<N;++j){
+			A[i][j] = exp_A[i][j];
+		}
+	}
+    // mu    = expected_mu;
+	for(i=0;i<D;++i){
+		for(j=0;j<N;++j){
+			mu[i][j] = exp_mu[i][j];
+		}
+	}
 
+    //Sigma = expected_Sigma; 
+
+	for(k=0;k<N;++k){
+		for(i=0;i<D;++i){
+			for(j=0;j<D;++j){
+				Sigma[i][j][k] = exp_sigma[i][j][k];
+			}
+		}
+	}
 
 
 	// release
@@ -1701,112 +1700,6 @@ void EM(float **observations, float **A, float **B, float **alpha, float **beta,
 	}
 	free(observations_t);
 	free(gammaob_ob_t);
-
-
-/*
-
-
-//	
-//	   for(i=0;i<N;i++){
-//	   for(j=0;j<N;j++){
-//	   printf("%lf ",exp_A[i*N+j]);
-//	   }
-//	   printf("\n");
-//	   }	
-//
-
-
-
-
-
-	for(k=0;k<N;k++){
-		//repmat gamma
-		offset = k*T;
-		for(i=0;i<D;i++){ // num of repeats
-			start = i*T;
-			for(j=0;j<T;j++){
-				gamma_obs[start+j]=gamma[j+offset];	
-			}	
-		}
-		// now gamma_obs is DxT
-		// dot multiplication with observations
-		for(i=0;i<D;i++){
-			for(j=0;j<T;j++){
-				gamma_obs[i*T+j] *= observations[j*D+i];	
-			}
-		}
-	//	
-	//	   if(k==0){
-	//	   for(i=0;i<D;i++){
-	//	   printf("gamma_obs,  round %d\n",i+1);
-	//	   for(j=0;j<T;j++){
-	//	   printf("%10lf\n", gamma_obs[i*T+j]);
-	//	   }
-	//	   printf("\n---------------------\n");
-	//	   }
-	//	   }
-	//	 
-
-		//update exp_mu : DxN
-		for(i=0;i<D;i++){
-			tmp=0;
-			for(j=0;j<T;j++){
-				tmp += gamma_obs[i*T+j];	
-			}
-			exp_mu[i*N+k] = tmp/gamma_state_sum[k]; 
-		}
-	
-//		   if(k==0){
-//		   for(i=0;i<D;i++){
-//		   for(j=0;j<N;j++){
-//		   printf("%lf ",exp_mu[i*N+j]);	
-//		   }
-//		   printf("\n");
-//		   }
-//		   }
-//
-
-		// prepare symmetrize
-		// nominator : gamma_obs(DxT)  *  observations (TxD)
-		for(i=0;i<D;i++){ // row
-			for(j=0;j<D;j++){ // col
-				tmp = 0;	
-				for(n=0;n<T;n++){
-					tmp += gamma_obs[i*T+n]*observations[n*D+j];
-				}
-				gamma_obs_mul[i*D+j] = tmp;
-			}
-		}
-//		
-//		   if(k==0){
-//		   for(i=0;i<D;i++){
-//		   for(j=0;j<D;j++){
-//		   printf("%10e ", gamma_obs_mul[i*D+j]);
-//		   }
-//		   printf("\n");
-//		   }
-//
-//		   }
-//		 
-
-		// denominator:
-		for(i=0;i<D;i++){// row
-			for(j=0;j<D;j++){ // col
-				exp_mu_mul[i*D+j] = gamma_state_sum[k] - exp_mu[i*N+k]*exp_mu[j*N+k];
-				if(k==0)	printf("%10e ",exp_mu_mul[i*D+j]);
-			}	
-			if(k==0)	printf("\n");
-		}
-
-		// matrix division:    obs_div_mu = gamma_obs_mul (DxD) /	exp_mu_mul (DxD)
-		matrixDiv(gamma_obs_mul,D,D, exp_mu_mul,D,D, obs_div_mu);
-
-
-
-		// write symmetrize()	
-	}
-
-*/
 
 }
 

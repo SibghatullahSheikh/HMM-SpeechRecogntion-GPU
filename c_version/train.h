@@ -7,7 +7,22 @@
 extern "C"{
 #endif
 
+typedef struct
+{
+	char *name;
+	float *prior; // Nx1
+	float **A; // NxN
+	float **mu; //DxN
+	float ***sigma; // DxDxN
+	unsigned int N; // hidden states
+	unsigned int D; // feature dimension
+	unsigned int T; // frames
+} HMM;
+
+
 void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum, unsigned int hiddenstates);
+
+void train_sample(float **observations, float **observations_t, float*prior, float **A, float ***Sigma,float**mu, unsigned int N, unsigned int D, unsigned int T);
 
 void transpose(float **in, float **out, unsigned int row, unsigned int col);
 
@@ -35,7 +50,7 @@ void Forward(float **B, float **A, float *prior, float **alpha, unsigned int N, 
 
 void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T);
 
-void EM(float **observations, float **A, float **B, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T);
+void EM(float **observations, float *prior, float **A, float **mu, float **B, float ***Sigma, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T);
 
 void normalise_2d_f(float **x, unsigned int row, unsigned int col);
 
