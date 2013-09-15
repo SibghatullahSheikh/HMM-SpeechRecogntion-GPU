@@ -28,9 +28,10 @@ void transpose(float **in, float **out, unsigned int row, unsigned int col);
 
 void cov(float **input, unsigned int R, unsigned int C, float **result);
 
-void cholcov(float **sigma, unsigned int row, unsigned int col, float **C);
+void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsigned int loopID, unsigned int state);
 
-void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID);
+//void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID);
+void mvnpdf(float **B, float **observations_t, float **mu_t, float ***Sigma, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID);
 
 void LU_pivot(float **R, float *P, unsigned int n);
 

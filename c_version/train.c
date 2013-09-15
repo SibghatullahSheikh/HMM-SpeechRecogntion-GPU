@@ -211,8 +211,9 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 		PP();
 		exit(1);
 	}
+ 
 
-	mvnpdf(B,observations_t, mu_t,Sigma,N,T,D,loopID); 
+	mvnpdf(B,observations_t,mu_t,Sigma,N,T,D,loopID); 
 
 	if(loopID == 1 && 0){
 		check_2d_f(B,N,T);	
@@ -314,7 +315,8 @@ void cov(float **input, unsigned int R, unsigned int C, float **result)
 }
 
 // 85x6, 1x6 , 6x6
-void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID)
+
+void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsigned int N, unsigned int T, unsigned int D, unsigned int loopID)
 {
 	// out:	NxT
 	// obs: TxD
@@ -322,91 +324,86 @@ void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, 
 	// cov: DxDxN
 	// we need to generate multi-variate probability density function for N hidden states
 
-	unsigned int i,j,k,n;
-	//unsigned int stride = D*D;
 
+
+	// --------------- Parameters ------------------//
+	unsigned int i,j,n;
+	unsigned int state;
+	//unsigned int stride = D*D;
 	double tmp;
 	float data;
-
 	float logSqrtDetSigma;
-
-
 	float **X0=(float**)malloc(sizeof(float*)*T);// TxD
 	for(i=0;i<T;++i){
 		X0[i] = (float*)malloc(sizeof(float)*D);
 	}
 
-	float *mu = (float*)malloc(sizeof(float)*D); // 1xD
-
-	float **sigma  = 	(float**)malloc(sizeof(float*)*D); // DxD
+	float *mu_mvn = (float*)malloc(sizeof(float)*D); // 1xD
+	float **sigma_mvn  = 	(float**)malloc(sizeof(float*)*D); // DxD
 	float **R 	   =	(float**)malloc(sizeof(float*)*D); // DxD
 	float **R_pinv =	(float**)malloc(sizeof(float*)*D); // DxD
 	for(i=0;i<D;++i){
-		sigma[i] 	= (float*)malloc(sizeof(float)*D);
+		sigma_mvn[i] 	= (float*)malloc(sizeof(float)*D);
 		R[i] 	 	= (float*)malloc(sizeof(float)*D);
 		R_pinv[i] 	= (float*)malloc(sizeof(float)*D);
 	}
-
 	float **xRinv = (float**)malloc(sizeof(float*)*T);// TxD
 	float **tmpx = (float**)malloc(sizeof(float*)*T);// TxD
 	for(i=0;i<T;++i){
 		xRinv[i] = (float*)malloc(sizeof(float)*D);
 		tmpx[i] = (float*)malloc(sizeof(float)*D);
 	}
-
 	float *quadform; // Tx1
 	quadform=(float*)malloc(sizeof(float)*T);
 
 
 	
-	for(k=0;k<N;++k){ 	// selected states
+	// --------------- loop through hidden states ------------------//
+
+	for(state=0;state<N;++state){ 	// selected states
 		//fetch mu	
 		
-		for(i=0;i<D;i++){
-			mu[i] = mean[k][i];
-		}
-		//fetch sigma
-		for(i=0;i<D;i++){
-			for(j=0;j<D;j++){
-				sigma[i][j] = cov[i][j][k];
-			}
+		for(i=0;i<D;++i){
+			mu_mvn[i] = mu_t[state][i];
 		}
 
+		if(loopID == 1 && state==0 && 0){
+			check_1d_f(mu_mvn,D);	
+			PP();
+			exit(1);
+		}
+
+		// sigma = Sigma(:, :, s);
+		for(i=0;i<D;++i){
+			for(j=0;j<D;++j){
+				sigma_mvn[i][j] = Sigma[i][j][state];
+			}
+		}
 		
 		// X0 = bsxfun(@minus,XY,mu);
 		for(i=0;i<T;++i){
 			for(j=0;j<D;++j){
 				//X0[i*D+j]= obs[i*D+j]-mu[j];	
-				X0[i][j]= obs[i][j]-mu[j];	
+				X0[i][j]= observations_t[i][j]-mu_mvn[j];	
 			}	
 		}
 
-		if(k==0 && 0){
-
-			printf("sigma(%d)\n",k+1);
-			for(i=0;i<D;++i){
-				for(j=0;j<D;++j){
-					printf("%f ",sigma[i][j]);
-				}
-				printf("\n");
-			}
+		if(loopID == 1 && state==0 && 0){
+			check_2d_f(X0,T,D);	
+			PP();
+			exit(1);
 		}
-
 
 		// R = chol(sigma);
 		// this is the square matrix
-		cholcov(sigma,D,D,R);
-		
-		if(k==0 && 0){
+		cholcov(sigma_mvn,D,D,R,loopID,state);
 
-			printf("R(%d)\n",k+1);
-			for(i=0;i<D;++i){
-				for(j=0;j<D;++j){
-					printf("%f ",R[i][j]);
-				}
-				printf("\n");
-			}
+		if(loopID == 1 && state==0 && 1){
+			check_2d_f(R,D,D);	
+			PP();
+			exit(1);
 		}
+		
 
 		// xRinv*R =X0
 		pinv_main(R,R_pinv,D);
@@ -424,14 +421,6 @@ void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, 
 			}
 		}
 
-		if(k==0 && 0){
-			for(i=0;i<T;++i){
-				for(j=0;j<D;++j){
-					printf("%10.5f ",xRinv[i][j]);
-				}
-				printf("\n");
-			}
-		}
 
 		logSqrtDetSigma=0.f;
 		for(i=0;i<D;++i){
@@ -451,7 +440,7 @@ void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, 
 
 		//d=size(XY,2); // d=2
 		//y = exp(-0.5*quadform - logSqrtDetSigma - d*log(2*pi)/2);
-		data = logSqrtDetSigma + log(TWOPI)*(float)D/2.0;
+		data = logSqrtDetSigma + log(TWOPI)*(float)D*0.5;
 		//printf("%lf\n",tmp);
 
 		// output
@@ -461,9 +450,8 @@ void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, 
 			//B[k][i] = exp(-0.5*quadform[i] - data); 
 			tmp = exp(-0.5*quadform[i] - data); 
 			//printf("%e\n",tmp);
-			B[k][i] = tmp;
+			B[state][i] = tmp;
 		}
-
 
 
 	}
@@ -480,25 +468,25 @@ void mvnpdf(float **B, float **obs, float **mean, float ***cov, unsigned int N, 
 
 	for(i=0;i<D;++i)
 	{
-		free(sigma[i]);
+		free(sigma_mvn[i]);
 		free(R[i]);
 		free(R_pinv[i]);
 	}
 
-	free(sigma);
+	free(sigma_mvn);
 	free(R);
 	free(R_pinv);
 	free(xRinv);
 	free(tmpx);
 	free(X0);
-	free(mu);
+	free(mu_mvn);
 
 	free(quadform);
 
 }
 
 // Cholesky-like covariance decomposition
-void cholcov(float **sigma, unsigned int row, unsigned int col, float **C)
+void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsigned int loopID, unsigned int state)
 {
 
 	if(row != col){
