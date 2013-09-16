@@ -66,7 +66,7 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 
 	for(loopID=0;loopID<15;++loopID)
 	{
-		printf("loop = %d\n", loopID);
+		// printf("loop = %d\n", loopID);
 
 		if(loopID==0) // initialize parameters
 		{
@@ -127,12 +127,15 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 		train_sample(observations, observations_t, prior,A,Sigma,mu,N,D,T,loopID);
 
 		if(loopID==0 && 0){
-
+			puts("prior=");
+			check_1d_f(prior,N);	
+			puts("A=");
+			check_2d_f(A,N,N);	
+			puts("mu=");
 			check_2d_f(mu,D,N);	
-			//check_1d_f(prior,N);	
-			//check_2d_f(A,N,N);	
-			//check_3d_f(Sigma,D,D,N);	
-			//exit(1);
+			puts("Sigma=");
+			check_3d_f(Sigma,D,D,N);	
+			exit(1);
 		}
 
 	}	
@@ -186,10 +189,14 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 	transpose(mu, mu_t, D, N);
 
 	if(loopID == 1 && 0){
+		puts("prior=");
+		check_1d_f(prior,N);	
+		puts("A=");
+		check_2d_f(A,N,N);	
+		puts("mu=");
 		check_2d_f(mu,D,N);	
-
-		puts("transpose");
-		check_2d_f(mu_t,N,D);	
+		puts("Sigma=");
+		check_3d_f(Sigma,D,D,N);	
 		exit(1);
 	}
 
@@ -207,25 +214,31 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 	}
 
 	if(loopID == 1 && 0){
+		puts("observations transpose =");
 		check_2d_f(observations_t,T,D);	
+		puts("mu transpose =");
+		check_2d_f(mu_t,T,D);	
 		PP();
 		exit(1);
 	}
 
-
+	init_2d_f(B,N,T,0.f);
 	mvnpdf(B,observations_t,mu_t,Sigma,N,T,D,loopID); 
 
+	// debug
 	if(loopID == 1 && 0){
-		check_2d_f(B,N,T);	
+		int j;
+		puts("B=");
+		//check_2d_f(B,N,T);	
+		for(i=0;i<T;++i){
+			for(j=0;j<N;++j){
+				printf("%.5e \t",B[j][i]);
+			}
+			printf("\n");
+		}
+		PP();
 		exit(1);
 	}
-
-	//	for(i=0;i<N;++i){
-	//		printf("N=%d \n", i+1);
-	//		for(j=0;j<T;++j){
-	//			printf("%.5e\n",B[i][j]);
-	//		}
-	//	}
 
 
 
@@ -243,7 +256,12 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 	Forward(B,A,prior,alpha,N,T,&log_likelihood);
 
 	printf("log_likelihood=%f\n",log_likelihood);
-
+	
+	// debug
+	if(loopID == 1 && 0){
+		PP();
+		exit(1);
+	}
 
 
 
@@ -259,14 +277,41 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 
 	Backward(A,B,beta,N,T);
 
-	//check_2d_f(beta,N,T);
+	// debug
+	if(loopID == 1 && 0){
+		int j;
+		puts("beta=");
+		//check_2d_f(B,N,T);	
+		for(i=0;i<T;++i){
+			for(j=0;j<N;++j){
+				printf("%.5e \t",B[j][i]);
+			}
+			printf("\n");
+		}
+		PP();
+		exit(1);
+	}
+
 
 	//---------------------------------------------------------------//
 	//						Expectation-Maximization 
 	//---------------------------------------------------------------//
 	EM(observations,prior,A,mu,B,Sigma,alpha,beta,D,N,T);
 
+	// debug
 
+	if(loopID==1 && 0){
+		puts("prior=");
+		check_1d_f(prior,N);	
+		puts("A=");
+		check_2d_f(A,N,N);	
+		puts("mu=");
+		check_2d_f(mu,D,N);	
+		puts("Sigma=");
+		check_3d_f(Sigma,D,D,N);	
+		PP();
+		exit(1);
+	}
 
 	// release
 	for(i=0;i<N;++i){
@@ -329,6 +374,7 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 	// --------------- Parameters ------------------//
 	unsigned int i,j,n;
 	unsigned int state;
+
 	//unsigned int stride = D*D;
 	double tmp;
 	float data;
@@ -368,6 +414,7 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 		}
 
 		if(loopID == 1 && state==0 && 0){
+			puts("mu=");
 			check_1d_f(mu_mvn,D);	
 			PP();
 			exit(1);
@@ -379,6 +426,14 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 				sigma_mvn[i][j] = Sigma[i][j][state];
 			}
 		}
+		if(loopID == 1 && state==0 && 0){
+			puts("Sigma=");
+			check_2d_f(sigma_mvn,D,D);	
+			PP();
+			exit(1);
+		}
+
+
 
 		// X0 = bsxfun(@minus,XY,mu);
 		for(i=0;i<T;++i){
@@ -388,21 +443,19 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 			}	
 		}
 
-		if(loopID == 0 && state==0 && 0){
-
-			// check_2d_f(X0,T,D);	
-			// check sigma
-			puts("sigma_mvn=");
-			check_2d_f(sigma_mvn,D,D);
+		if(loopID == 1 && state==0 && 0){
+			puts("X0=");
+			check_2d_f(X0,T,D);
 			PP();
-			//exit(1);
+			exit(1);
 		}
 
 		// R = chol(sigma);
 		// this is the square matrix
 		cholcov(sigma_mvn,D,D,R,loopID,state);
 
-		if(loopID == 0 && state==0 && 0){
+		if(loopID == 1 && state==0 && 0){
+			puts("R=");
 			check_2d_f(R,D,D);	
 			PP();
 			exit(1);
@@ -412,6 +465,12 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 		// xRinv*R =X0
 		pinv_main(R,R_pinv,D);
 
+		if(loopID == 1 && state==0 && 0){
+			puts("R_pinv=");
+			check_2d_f(R_pinv,D,D);	
+			PP();
+			exit(1);
+		}
 
 		// find xRinv = x0 * R_pinv
 		// implement matrix multiplication
@@ -425,12 +484,26 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 			}
 		}
 
+		// debug
+		if(loopID == 1 && state==0 && 0){
+			puts("xRinv=");
+			check_2d_f(xRinv,T,D);	
+			PP();
+			exit(1);
+		}
+
 
 		logSqrtDetSigma=0.f;
 		for(i=0;i<D;++i){
 			logSqrtDetSigma = logSqrtDetSigma + log(R[i][i]);	
 		}	
-		//printf("logSqrtDetSigma=%.5f\n",logSqrtDetSigma);
+		
+		// debug
+		if(loopID == 1 && state==0 && 0){
+			printf("logSqrtDetSigma=%.5f\n",logSqrtDetSigma);
+			PP();
+			exit(1);
+		}
 
 		// quadform = sum(xRinv.^2, 2);
 		for(i=0;i<T;++i){
@@ -439,22 +512,40 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 				tmp += pow(xRinv[i][j],2.0);	
 			}
 			quadform[i]= (float)tmp;
-			//printf("%.5f\n",quadform[i]);
 		}
+		// debug
+		if(loopID == 1 && state==0 && 0){
+			for(i=0;i<T;++i)	printf("%.5f\n",quadform[i]);
+			PP();
+			exit(1);
+		}
+
 
 		//d=size(XY,2); // d=2
 		//y = exp(-0.5*quadform - logSqrtDetSigma - d*log(2*pi)/2);
-		data = logSqrtDetSigma + log(TWOPI)*(float)D*0.5;
-		//printf("%lf\n",tmp);
+		data = logSqrtDetSigma + log(TWOPI)*D*0.5;
+		// debug
+		if(loopID == 1 && state==0 && 0){
+			printf("data = %.5f\n",data);
+			PP();
+			exit(1);
+		}
 
-		// output
-
-		// printf("k=%d\n",k);
 		for(i=0;i<T;++i){
-			//B[k][i] = exp(-0.5*quadform[i] - data); 
 			tmp = exp(-0.5*quadform[i] - data); 
-			//printf("%e\n",tmp);
 			B[state][i] = tmp;
+		}
+		// debug
+		if(loopID == 1 && state==0 && 0){
+			puts("B=");
+			for(i=0;i<T;++i){
+				for(j=0;j<N;++j){
+					printf("%.5e \t",B[j][i]);
+				}
+				printf("\n");
+			}
+			PP();
+			exit(1);
 		}
 
 
@@ -505,6 +596,7 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 	for(i=0;i<n;++i){
 		T[i] = (float*) malloc(sizeof(float)*n);
 	}
+
 
 	// chol() check "positive definite"
 	perr = 0;
