@@ -402,7 +402,7 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 		// this is the square matrix
 		cholcov(sigma_mvn,D,D,R,loopID,state);
 
-		if(loopID == 1 && state==0 && 1){
+		if(loopID == 0 && state==0 && 0){
 			check_2d_f(R,D,D);	
 			PP();
 			exit(1);
@@ -492,16 +492,47 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 // Cholesky-like covariance decomposition
 void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsigned int loopID, unsigned int state)
 {
+	unsigned int n = row;
+	unsigned int i,j;
+	int perr;
 
 	if(row != col){
 		printf("Current cholcov() only works for square matrix! FILE:%s, LINE:%d",__FILE__,__LINE__);
 		exit(1);
 	}
 
-	unsigned int n = row;
-	unsigned int i,j,k;
-	double tmp;
+	float **T = (float**) malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		T[i] = (float*) malloc(sizeof(float)*n);
+	}
 
+	// chol() check "positive definite"
+	perr = 0;
+	chol(sigma,n,T,&perr);
+	
+	if(perr>0)
+	{
+		// find the cholesky-like 
+		printf("Need to work on eig() here!\n");
+		PP();
+		exit(1);
+	}
+
+	// update C
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			C[i][j] = T[i][j];
+		}
+	}
+
+	// release
+	for(i=0;i<n;++i){
+		free(T[i]);
+	}
+	free(T);
+
+/*
+	double tmp;
 	//x = sigma+sigma';
 	float **x = (float**) malloc(sizeof(float*)*n);
 	for(i=0;i<n;++i){
@@ -672,9 +703,44 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 	free(U_t);
 	free(diagD);
 	free(t);
-
+*/
 }
 
+void chol(float **sigma, unsigned int n, float **T, int *perr)
+{
+	// 
+	init_2d_f(T,n,n,0.f);
+
+	int i,j,m;
+	float s;
+	double tmp;
+	for(i=0;i<n;i++){
+		for(j=i;j<n;j++){
+
+			if(j==0){
+				s = sigma[i][i]; // i=0,j=0 is special case
+			}else{
+				tmp=0.0;
+				for(m=0;m<=i;m++){
+					tmp = tmp + T[m][i]*T[m][j];
+				}
+				s = sigma[i][j] - (float)tmp;
+			}
+			if(j>i){
+				T[i][j] = s/T[i][i];
+			}else{
+				if(s<=0){
+					//printf("C is not positive definite to working precision.\n");
+					*perr  = 1;
+					return;
+				}
+				T[i][i] = sqrt(s);
+			}
+
+		}
+	}
+	return;
+}
 
 void PowerMethod(float **matrix, float **U, float **D, unsigned int n, unsigned int loopID, unsigned int state)
 {
