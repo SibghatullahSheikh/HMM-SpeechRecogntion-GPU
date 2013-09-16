@@ -98,10 +98,9 @@ void check_2d_f(float **array, unsigned int row, unsigned int col)
 
 	for(i=0;i<row;++i)
 	{
-		printf("row = %d\n", i);
 		for(j=0;j<col;++j)
 		{
-			printf("%10.5f \n",array[i][j]);	
+			printf("%10.5f ",array[i][j]);	
 		
 		}
 		printf("\n");

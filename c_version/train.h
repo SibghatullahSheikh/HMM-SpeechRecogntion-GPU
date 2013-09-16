@@ -59,6 +59,19 @@ void normalise_1d_f(float *x, unsigned int len);
 
 void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **out);
 
+void jacobi_eig(float **matrix, float **U, float **D, unsigned int n);
+
+// void sort_eig(float **U, float **D, unsigned int n);
+
+void PowerMethod(float **matrix, float **U, float **D, unsigned int n, unsigned int loopID, unsigned int state);
+
+void power_method (unsigned int n, float **a, float *eigvec, int iterMax, float TOL, float *lambda, int *iter_num);
+
+float r8vec_norm_l2 (unsigned int n, float *y);
+
+void r8mat_mv(unsigned int m, unsigned int n, float **a, float *x, float *y);
+
+float r8vec_dot(unsigned int n, float *a1, float *a2 );
 
 
 #ifdef __cplusplus

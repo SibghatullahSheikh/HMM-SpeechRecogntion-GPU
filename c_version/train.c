@@ -73,7 +73,7 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 			prior[0] = 0.555826367548231;
 			prior[1] = 0.384816327750085;
 			prior[2] = 0.0593573047016839;
-			
+
 			A[0][0]=0.126558246942481;
 			A[0][1]=0.438475341086527;
 			A[0][2]=0.434966411970992;
@@ -120,14 +120,14 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 			//	word.N = hiddenstates; 
 			//	word.D = featureDim; 
 			//	word.T = frameNum; 
-		
+
 		}
 
 		// pass reference	
 		train_sample(observations, observations_t, prior,A,Sigma,mu,N,D,T,loopID);
 
 		if(loopID==0 && 0){
-			
+
 			check_2d_f(mu,D,N);	
 			//check_1d_f(prior,N);	
 			//check_2d_f(A,N,N);	
@@ -182,7 +182,7 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 	for(i=0;i<N;++i){
 		mu_t[i] = (float*)malloc(sizeof(float)*D);
 	}
-	
+
 	transpose(mu, mu_t, D, N);
 
 	if(loopID == 1 && 0){
@@ -211,7 +211,7 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 		PP();
 		exit(1);
 	}
- 
+
 
 	mvnpdf(B,observations_t,mu_t,Sigma,N,T,D,loopID); 
 
@@ -220,12 +220,12 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 		exit(1);
 	}
 
-//	for(i=0;i<N;++i){
-//		printf("N=%d \n", i+1);
-//		for(j=0;j<T;++j){
-//			printf("%.5e\n",B[i][j]);
-//		}
-//	}
+	//	for(i=0;i<N;++i){
+	//		printf("N=%d \n", i+1);
+	//		for(j=0;j<T;++j){
+	//			printf("%.5e\n",B[i][j]);
+	//		}
+	//	}
 
 
 
@@ -246,7 +246,7 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 
 
 
-	
+
 
 	//---------------------------------------------------------------//
 	//						backward algorithm
@@ -258,7 +258,7 @@ void train_sample(float **observations, float **observations_t,float*prior, floa
 	}
 
 	Backward(A,B,beta,N,T);
-    
+
 	//check_2d_f(beta,N,T);
 
 	//---------------------------------------------------------------//
@@ -357,12 +357,12 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 	quadform=(float*)malloc(sizeof(float)*T);
 
 
-	
+
 	// --------------- loop through hidden states ------------------//
 
 	for(state=0;state<N;++state){ 	// selected states
 		//fetch mu	
-		
+
 		for(i=0;i<D;++i){
 			mu_mvn[i] = mu_t[state][i];
 		}
@@ -379,7 +379,7 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 				sigma_mvn[i][j] = Sigma[i][j][state];
 			}
 		}
-		
+
 		// X0 = bsxfun(@minus,XY,mu);
 		for(i=0;i<T;++i){
 			for(j=0;j<D;++j){
@@ -388,10 +388,14 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 			}	
 		}
 
-		if(loopID == 1 && state==0 && 0){
-			check_2d_f(X0,T,D);	
+		if(loopID == 0 && state==0 && 0){
+
+			// check_2d_f(X0,T,D);	
+			// check sigma
+			puts("sigma_mvn=");
+			check_2d_f(sigma_mvn,D,D);
 			PP();
-			exit(1);
+			//exit(1);
 		}
 
 		// R = chol(sigma);
@@ -403,7 +407,7 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 			PP();
 			exit(1);
 		}
-		
+
 
 		// xRinv*R =X0
 		pinv_main(R,R_pinv,D);
@@ -444,7 +448,7 @@ void mvnpdf(float **B,float **observations_t, float **mu_t, float ***Sigma, unsi
 		//printf("%lf\n",tmp);
 
 		// output
-		
+
 		// printf("k=%d\n",k);
 		for(i=0;i<T;++i){
 			//B[k][i] = exp(-0.5*quadform[i] - data); 
@@ -510,29 +514,16 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 		}	
 	}
 
-//	printf("\nx=\n");
-//	for(i=0;i<n;++i){
-//		for(j=0;j<n;++j){
-//			printf("%f ",x[i][j]);
-//		}	
-//		printf("\n");
-//	}
 
-//---------------------------
-//	[u,s,v]=jacobi_svd(x/2);
-//	U = v;
-//	D = s;
-//---------------------------
+
+	//------------------------------------
+	// [U,D] = eig(full((sigma+sigma')/2))
+	//------------------------------------
+
 	float **U;
 	U = (float**)malloc(sizeof(float*)*n);
 	for(i=0;i<n;++i){
 		U[i] = (float*)malloc(sizeof(float)*n);
-	}
-
-	float **u;
-	u = (float **)malloc(sizeof(float*)*n);
-	for(i=0;i<n;++i){
-		u[i] = (float*)malloc(sizeof(float)*n);
 	}
 
 	float **D;
@@ -541,41 +532,81 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 		D[i] = (float*)malloc(sizeof(float)*n);
 	}
 
-	svd(x,u,D,U,n);
+	if(loopID == 0 && state==0 && 0){
+		puts("x=");
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				printf("%10.5f ",x[i][j]);
+			}	
+			printf("\n");
+		}
+		PP();
+		exit(1);
+	}
 
-//	printf("D=\n");
-//	for(i=0;i<n;++i){
-//		for(j=0;j<n;++j){
-//			printf("%10.5e \t", D[i][j]);
-//		}
-//		printf("\n");
-//	}
-//
-//	printf("U=\n");
-//	for(i=0;i<n;++i){
-//		for(j=0;j<n;++j){
-//			printf("%10.5f \t", U[i][j]);
-//		}
-//		printf("\n");
-//	}
-//
+	//jacobi_eig(x,U,D,n);
+	// sort the eigenvalues in increasing order along diagonal
+	//sort_eig(U,D,n);
+
+	PowerMethod(x,U,D,n, loopID, state);
+
+	if(loopID == 1 && state==0 && 1){
+		//check_2d_f(U,n,n);	
+		//check_2d_f(D,n,n);	
+		puts("U=");
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				printf("%10.5f ",U[i][j]);
+			}	
+			printf("\n");
+		}
+		puts("D=");
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				printf("%10.5f ",D[i][j]);
+			}	
+			printf("\n");
+		}
+
+		PP();
+		exit(1);
+	}
+
+	//svd(x,u,D,U,n);
+
+	//	printf("D=\n");
+	//	for(i=0;i<n;++i){
+	//		for(j=0;j<n;++j){
+	//			printf("%10.5e \t", D[i][j]);
+	//		}
+	//		printf("\n");
+	//	}
+	//
+	//	printf("U=\n");
+	//	for(i=0;i<n;++i){
+	//		for(j=0;j<n;++j){
+	//			printf("%10.5f \t", U[i][j]);
+	//		}
+	//		printf("\n");
+	//	}
+	//
 
 
-//-------------------------------------------
-//	[ignore,maxind] = max(abs(U),[],1);
-//	negloc = (U(maxind + (0:n:(m-1)*n)) < 0);
-//	U(:,negloc) = -U(:,negloc);
-//-------------------------------------------
+	//-------------------------------------------
+	//	[ignore,maxind] = max(abs(U),[],1);
+	//	negloc = (U(maxind + (0:n:(m-1)*n)) < 0);
+	//	U(:,negloc) = -U(:,negloc);
+	//-------------------------------------------
 
 
-//-------------------------------------------
-//	D = diag(D);
-//	tol = eps(max(D)) * length(D);
-//	t = (abs(D) > tol);
-//	D = D(t);
-//	p = sum(D<0); % number of negative eigenvalues
-//	T = diag(sqrt(D)) * U(:,t)'
-//-------------------------------------------
+	//-------------------------------------------
+	//	D = diag(D);
+	//	tol = eps(max(D)) * length(D);
+	//	t = (abs(D) > tol);
+	//	D = D(t);
+	//	p = sum(D<0); % number of negative eigenvalues
+	//	T = diag(sqrt(D)) * U(:,t)'
+	//-------------------------------------------
 	float *diagD = 	(float*)malloc(sizeof(float)*n);
 	int *t = (int*)malloc(sizeof(int)*n);
 
@@ -631,18 +662,396 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 	// release
 	for(i=0;i<n;++i){
 		free(x[i]);
-		free(u[i]);
 		free(D[i]);
 		free(U[i]);
 		free(U_t[i]);
 	}
 	free(x);
-	free(u);
 	free(D);
 	free(U);
 	free(U_t);
 	free(diagD);
 	free(t);
+
+}
+
+
+void PowerMethod(float **matrix, float **U, float **D, unsigned int n, unsigned int loopID, unsigned int state)
+{
+	// U: eigenvectors
+	// D: eigenvalues
+	int iterMax = 1e3;
+	int iter_num = 0;
+	int i,j,k;
+
+	float TOL = 1e-8;
+	float lambda = 0.f;
+
+	float **a = (float**)malloc(sizeof(float*)*n);
+	for(i=0;i<n;++i){
+		a[i] = (float*)malloc(sizeof(float)*n);
+	}
+	float *eigvec = (float*)malloc(sizeof(float)*n);
+
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			a[i][j] = matrix[i][j];	
+		}
+	}	
+
+	if(loopID == 0 && state==0 && 0){
+		puts("a=");
+		check_2d_f(a,n,n);
+
+		PP();
+		exit(1);
+	}
+
+
+	for(k=n-1;k>=0;k--)	// k eigenvalues and eigenvectors
+	{
+		// initialize eigvenvector
+		for(i=0;i<n;++i){
+			eigvec[i] = a[i][0];
+		}	
+
+		power_method(n, a, eigvec, iterMax, TOL, &lambda, &iter_num);
+
+		// save lambda and eigvec
+		for(i=0;i<n;++i){
+			D[i][k] = (i==k) ? lambda: 0.f;
+			U[i][k] = eigvec[i];
+		}	
+
+		if(loopID == 0 && state==0 && k==(n-1) &&1){
+			puts("D=");
+			check_2d_f(D,n,n);
+			puts("U=");
+			check_2d_f(U,n,n);
+
+			PP();
+			exit(1);
+		}
+	}
+
+
+
+
+	//release
+	free(eigvec);
+	for(i=0;i<n;++i){
+		free(a[i]);
+	}
+	free(a);
+}
+
+void power_method (unsigned int n, float **a, float *eigvec, int iterMax, float TOL, float *lambda, int *iter_num)
+{
+	float *ay;
+	float *y_old;
+	float *y;
+
+	y=eigvec;
+
+	float cos_y1y2;
+	int i;
+	int it;
+	float lambda_old;
+	float norm;
+	float sin_y1y2;
+	float val_dif;
+
+	ay = (float*)malloc(n*sizeof(float));
+	y_old = (float*)malloc(n*sizeof(float));
+
+
+	// Force Y to be a vector of unit norm.
+	norm = r8vec_norm_l2(n,y);
+
+	for ( i = 0; i < n; i++ )
+	{
+		y[i] = y[i] / norm;
+	}
+
+	it = 0;
+
+	// save pre eigenvector
+	for ( i = 0; i < n; i++ )
+	{
+		y_old[i] = y[i];
+	}
+
+	r8mat_mv ( n, n, a, y, ay );
+	*lambda = r8vec_dot ( n, y, ay );
+	norm = r8vec_norm_l2 ( n, ay );
+
+	for ( i = 0; i < n; i++ )
+	{
+		y[i] = ay[i] / norm;
+	}
+
+	if ( *lambda < 0.0 )
+	{
+		for ( i = 0; i < n; i++ )
+		{
+			y[i] = - y[i];
+		}
+	}
+
+	val_dif = 0.0;
+	cos_y1y2 = r8vec_dot ( n, y, y_old );
+	sin_y1y2 = sqrt ( ( 1.0 - cos_y1y2 ) * ( 1.0 + cos_y1y2 ) );
+
+	for ( it = 1; it <= iterMax; it++ )
+	{
+		lambda_old = *lambda;
+		for ( i = 0; i < n; i++ )
+		{
+			y_old[i] = y[i];
+		}
+
+		r8mat_mv ( n, n, a, y, ay );
+		*lambda = r8vec_dot ( n, y, ay );
+		norm = r8vec_norm_l2 ( n, ay );
+		for ( i = 0; i < n; i++ )
+		{
+			y[i] = ay[i] / norm;
+		}
+		if ( *lambda < 0.0 )
+		{
+			for ( i = 0; i < n; i++ )
+			{
+				y[i] = - y[i];
+			}
+		}
+
+		// val_dif = r8_abs ( *lambda - lambda_old );
+		val_dif = fabs ( *lambda - lambda_old );
+
+		cos_y1y2 = r8vec_dot ( n, y, y_old );
+		sin_y1y2 = sqrt ( ( 1.0 - cos_y1y2 ) * ( 1.0 + cos_y1y2 ) );
+
+		if ( val_dif <= TOL )
+		{
+			break;
+		}
+	}
+
+	for ( i = 0; i < n; i++ )
+	{
+		y[i] = ay[i] / (*lambda);
+	}
+
+	*iter_num = it;
+
+
+	// release
+	free ( ay );
+	free ( y_old );
+
+	return;
+}
+
+float r8vec_dot(unsigned int n, float *a1, float *a2 )
+{
+  int i;
+  double value;
+
+  value = 0.0;
+  for ( i = 0; i < n; i++ )
+  {
+    value = value + a1[i] * a2[i];
+  }
+  return (float)value;
+}
+
+
+float r8vec_norm_l2 (unsigned int n, float *y)
+{
+	int i;
+	double v;
+	v = 0.0;
+	for ( i = 0; i < n; i++ )
+	{
+		v = v + y[i] * y[i];
+	}
+	v = sqrt ( v );
+
+	return (float)v;
+}
+
+void r8mat_mv(unsigned int m, unsigned int n, float **a, float *x, float *y)
+{
+	int i;
+	int j;
+	for ( i = 0; i < m; i++ )
+	{
+		y[i] = 0.0;
+		for ( j = 0; j < n; j++ )
+		{
+			y[i] = y[i] + a[j][i] * x[j];
+		}
+	}
+
+	return;
+}
+
+void jacobi_eig(float **matrix, float **U, float **D, unsigned int n)
+{
+	// copy x to D 
+	int i,j,p,q;
+	float ff;
+	float d;
+	float fm,cn,sn,omega,x,y;
+	float **v;
+	float eps = 1e-8;
+
+	v = U; // eigenvectors
+
+	// diag are eigenvalues: D
+	float **a;
+	a = D;
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			a[i][j] = matrix[i][j];	
+		}
+	}
+
+	// identity matrix U;
+	for (i=0; i<=n-1; i++)
+	{
+		for (j=0; j<=n-1; j++)
+		{
+			if (i == j){
+				v[i][j]=1.0;
+			}else{
+				v[i][j]=0.0;
+			}
+		}
+	}
+	ff = 0.0;
+	// sum along sub-diagonal
+	for (i=1; i<=n-1; i++){
+		for (j=0; j<=i-1; j++){
+			d=a[i][j]; 
+			ff=ff+d*d; 
+		}
+	}
+	ff=sqrt(2.0*ff);
+
+
+loop0:
+	ff = ff/(1.0*n);
+
+loop1:
+	for (i=1; i<=n-1; i++){
+		for (j=0; j<=i-1; j++)
+		{ 
+			d=fabs(a[i][j]);
+			if (d>ff){ // 
+				p=i; 
+				q=j;
+				goto loop;
+			}
+		}
+	}
+
+	if (ff<eps){
+		// diag(a)	
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				a[i][j] = (i==j)? a[i][j] : 0.f;	
+			}
+		}
+		return;
+	}
+	goto loop0;
+
+loop:
+	//u=p*n+q; 
+	//w=p*n+p; 
+	//t=q*n+p; 
+	//s=q*n+q;
+
+	x=-a[p][q]; 
+	y=(a[q][q]-a[p][p])*0.5;
+
+	omega=x/sqrt(x*x+y*y);
+
+	if (y<0.0) omega=-omega;
+
+	sn=1.0+sqrt(1.0-omega*omega);
+	sn=omega/sqrt(2.0*sn);
+	cn=sqrt(1.0-sn*sn);
+
+	fm=a[p][p];
+
+	a[p][p]=fm*cn*cn+a[q][q]*sn*sn+a[p][q]*omega;
+
+	a[q][q]=fm*sn*sn+a[q][q]*cn*cn-a[p][q]*omega;
+
+	a[p][q]=0.0; a[q][p]=0.0;
+
+	for (j=0; j<=n-1; j++){
+		if ((j!=p)&&(j!=q)){ 
+			//u=p*n+j; w=q*n+j;
+			fm=a[p][j];
+			a[p][j]=fm*cn+a[q][j]*sn;
+			a[q][j]=-fm*sn+a[q][j]*cn;
+		}
+	}
+
+	for (i=0; i<=n-1; i++)
+	{
+		if ((i!=p)&&(i!=q))
+		{ 
+			//u=i*n+p; w=i*n+q;
+			fm=a[i][p];
+			a[i][p]=fm*cn+a[i][q]*sn;
+			a[i][q]=-fm*sn+a[i][q]*cn;
+		}
+	}
+
+	for (i=0; i<=n-1; i++)
+	{ 
+		//u=i*n+p; w=i*n+q;
+		fm=v[i][p];
+		v[i][p]=fm*cn+v[i][q]*sn;
+		v[i][q]=-fm*sn+v[i][q]*cn;
+	}
+
+	goto loop1;
+
+}
+
+void sort_eig(float **U, float **D, unsigned int n)
+{
+	// find the max, check max_idx, if same , do nothing, otherwise swap
+	int i,j,k;
+	float max;
+
+	float tmp;
+
+	for(i=n-1; i>=0; i--){
+		max = D[i][i];
+		for(j=0;j<i;++j){
+			if(max < D[j][j]){
+				//swap	
+				max = D[j][j];
+
+				D[j][j] = D[i][i];
+				D[i][i] = max;
+
+				// switch column i and j of U
+				for(k=0;k<n;++k){
+					tmp = U[k][i];		
+					U[k][i] = U[k][j];
+					U[k][j] = -tmp;
+				}
+
+			}
+		}
+	}
 
 }
 
@@ -684,32 +1093,32 @@ void pinv_main(float **R, float **R_pinv, unsigned int D)
 	// svd
 	svd(input,U,S,V,n);
 
-/*
-	printf("\n--------------------\nSVD Results:\n");
-	printf("U=\n");
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			printf("%10.5f \t", U[i][j]);
-		}
-		printf("\n");
-	}
+	/*
+	   printf("\n--------------------\nSVD Results:\n");
+	   printf("U=\n");
+	   for(i=0;i<n;++i){
+	   for(j=0;j<n;++j){
+	   printf("%10.5f \t", U[i][j]);
+	   }
+	   printf("\n");
+	   }
 
-	printf("V=\n");
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			printf("%10.5f \t", V[i][j]);
-		}
-		printf("\n");
-	}
+	   printf("V=\n");
+	   for(i=0;i<n;++i){
+	   for(j=0;j<n;++j){
+	   printf("%10.5f \t", V[i][j]);
+	   }
+	   printf("\n");
+	   }
 
-	printf("S=\n");
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			printf("%10.5f \t", S[i][j]);
-		}
-		printf("\n");
-	}
-*/
+	   printf("S=\n");
+	   for(i=0;i<n;++i){
+	   for(j=0;j<n;++j){
+	   printf("%10.5f \t", S[i][j]);
+	   }
+	   printf("\n");
+	   }
+	 */
 
 	// pseudo inverse
 	pinv(U,S,V,n,R_pinv);
@@ -775,7 +1184,7 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 		for(j=1;j<n;++j){
 			for(k=0;k<=j-1;++k){
 				// compute [alpha gamma; gamma beta] = (k,j) submatrix of U'*U
-				
+
 				//alpha=sum(U(:,k).*U(:,k));
 				alpha = 0.0;
 				for(ind=0;ind<n;++ind){
@@ -788,7 +1197,7 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 					beta += U[ind][j]*U[ind][j];	
 				}
 
-      			//gamma=sum(U(:,k).*U(:,j));
+				//gamma=sum(U(:,k).*U(:,j));
 				gamma = 0.0;
 				for(ind=0;ind<n;++ind){
 					gamma += U[ind][k]*U[ind][j];	
@@ -797,7 +1206,7 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 				if(steps==0 && j==1 && k==0 && 0){
 					printf("alpha=%lf \t beta=%lf	\t gamma=%lf \n", alpha, beta, gamma);
 				}
-			
+
 				//converge=max(converge,abs(gamma)/sqrt(alpha*beta));
 				converge = MAX(converge, fabs(gamma)/sqrt(alpha*beta));
 
@@ -826,10 +1235,10 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 				}
 
 
-     			//update columns k and j of U
-      			//T=U(:,k);
-      			//U(:,k)=c*T-s*U(:,j);
-      			//U(:,j)=s*T+c*U(:,j);
+				//update columns k and j of U
+				//T=U(:,k);
+				//U(:,k)=c*T-s*U(:,j);
+				//U(:,j)=s*T+c*U(:,j);
 				for(ind=0;ind<n;++ind){
 					tmp = U[ind][k];
 					U[ind][k] =  (float)c*tmp - (float)s*U[ind][j];
@@ -845,8 +1254,8 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 						printf("\n");
 					}
 				}
-				
-      
+
+
 				//update matrix V of right singular vectors
 				//T=V(:,k);    
 				//V(:,k)=c*T-s*V(:,j);
@@ -867,8 +1276,8 @@ void svd(float **input, float **U, float **S, float **V, unsigned int n)
 						printf("\n");
 					}
 				}
-				
-			
+
+
 			}	
 		}
 
@@ -916,7 +1325,7 @@ int sign_d(double x)
 	}else{
 		out = 0;
 	}
-	
+
 	return out;
 }
 
@@ -1000,7 +1409,7 @@ void pinv(float **U, float **S, float **V, unsigned int n, float **X)
 		// s = diag(ones(r,1)./s(1:r));
 		for(i=0;i<r;++i){
 			s[i][i]	= 1.f/s[i][i];
-			
+
 		}
 
 		// X = V(:,1:r)*s*U(:,1:r)';
@@ -1084,7 +1493,7 @@ void Forward(float **B, float **A, float *prior, float **alpha, unsigned int N, 
 		}
 		else
 		{
-			
+
 			// alpha(:, t) = B(:, t) .* (A' * alpha(:, t - 1));
 			transpose(A, A_t, N, N);
 			for(j=0;j<N;++j)
@@ -1104,19 +1513,19 @@ void Forward(float **B, float **A, float *prior, float **alpha, unsigned int N, 
 				//	printf("%10e\n",alpha[j*T+i]);			
 				//}
 			}
-		
+
 		}	
 
 		// alpha_sum      = sum(alpha(:, t));
 		// alpha(:, t)    = alpha(:, t) ./ alpha_sum; 
-		
+
 		alpha_sum = 0.0;
-		
+
 		for(j=0;j<N;++j)
 		{
 			alpha_sum += alpha[j][i];
 		}
-		
+
 		for(j=0;j<N;++j)
 		{
 			alpha[j][i] /= (float)alpha_sum;
@@ -1166,7 +1575,7 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 	//---------------------
 	double beta_sum;
 	double tmp;
-	
+
 	//printf("T = %d\n",T);
 
 	for(i = (T-1); i-->0; )
@@ -1175,7 +1584,7 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 		for(j=0;j<N;++j){
 			beta_B[j] = beta[j][i+1]*B[j][i+1];	
 		}	
-		
+
 		beta_sum = 0.0;
 		for(j=0;j<N;++j){
 			tmp = 0.0;
@@ -1189,7 +1598,7 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 		for(j=0;j<N;++j){
 			beta[j][i] /= (float)beta_sum;
 		}
-	
+
 	}
 
 
@@ -1210,7 +1619,7 @@ void normalise_2d_f(float **x, unsigned int row, unsigned int col)
 	   A = bsxfun(@rdivide, A, z);
 	   end
 	 */
-	
+
 	// sum, columnwise
 	unsigned int i,j;
 	double sum=0.0;
@@ -1651,20 +2060,20 @@ void EM(float **observations, float *prior, float **A, float **mu, float **B, fl
 	for(i=0;i<N;++i){
 		prior[i] = exp_prior[i];
 	}
-    // A     = expected_A;
+	// A     = expected_A;
 	for(i=0;i<N;++i){
 		for(j=0;j<N;++j){
 			A[i][j] = exp_A[i][j];
 		}
 	}
-    // mu    = expected_mu;
+	// mu    = expected_mu;
 	for(i=0;i<D;++i){
 		for(j=0;j<N;++j){
 			mu[i][j] = exp_mu[i][j];
 		}
 	}
 
-    //Sigma = expected_Sigma; 
+	//Sigma = expected_Sigma; 
 
 	for(k=0;k<N;++k){
 		for(i=0;i<D;++i){
