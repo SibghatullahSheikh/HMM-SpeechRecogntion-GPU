@@ -15,6 +15,8 @@ void init_2d_f(float **frames, unsigned int row, unsigned int col, float val);
 
 void init_1d_f(float *array, unsigned int N, float val);
 
+void init_1d_d(double *array, unsigned int N, double val);
+
 void check_3d_f(float ***array, unsigned int row, unsigned int col, unsigned int N);
 
 void check_2d_f(float **array, unsigned int row, unsigned int col);
@@ -38,6 +40,17 @@ void normalise_1d_f(float *x, unsigned int len);
 void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **out);
 
 float norm_square(float **U, unsigned int j, unsigned int rows);
+
+void eye_2d_d(double **U,unsigned int row, unsigned int col);
+
+void get2ddiag_d(double **from,double *to, unsigned int row, unsigned int col);
+
+void copy_2d_d(double **a, double **a_pre, int row, int col);
+
+void copy_1d_d(double *from, double *to, int len);
+
+
+
 
 
 

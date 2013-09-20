@@ -325,4 +325,58 @@ float norm_square(float **U, unsigned int j, unsigned int rows)
 }
 
 
+void eye_2d_d(double **U,unsigned int row, unsigned int col)
+{
+	int i,j;
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			U[i][j] = (i==j)? 1.0: 0.0;
+		}
+	}
+}
+
+
+void get2ddiag_d(double **from,double *to, unsigned int row, unsigned int col)
+{
+	if(row != col){
+		puts("get2ddiag_f() currently works for square matrix only.");
+		exit(1);
+	}
+
+	int i;
+	int n = row;
+
+	for(i=0;i<n;++i){
+		to[i] =  from[i][i];
+	}
+}
+
+void copy_2d_d(double **a, double **a_pre, int row, int col)
+{
+	int i,j;
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			a_pre[i][j]  =  a[i][j];
+		}
+	}
+}
+
+void copy_1d_d(double *from, double *to, int len)
+{
+	int i;
+	for(i=0;i<len;++i){
+		to[i] = from[i];
+	}
+}
+
+void init_1d_d(double *array,unsigned int len, double value)
+{
+	int i;
+	for(i=0;i<len;++i){
+		array[i] = value;
+	}
+}
+
+
+
 

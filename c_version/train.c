@@ -660,12 +660,122 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 	{
 		// find the cholesky-like 
 		printf("Need to work on eig() here!\n");
-		
-		puts("sigma=");
-		check_2d_f(sigma,n,n);
-
 		PP();
-		exit(1);
+		//puts("sigma=");
+		//check_2d_f(sigma,n,n);
+
+		unsigned int k;
+		//x = sigma+sigma';
+		float **x = (float**) malloc(sizeof(float*)*n);
+		for(i=0;i<n;++i){
+			x[i] = (float*) malloc(sizeof(float)*n);
+		}
+
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				x[i][j]	 = (sigma[i][j] + sigma[j][i])/2;
+			}	
+		}
+
+
+		// [U,D] = eig(full((sigma+sigma')/2))
+		float **U;
+		U = (float**)malloc(sizeof(float*)*n);
+		for(i=0;i<n;++i){
+			U[i] = (float*)malloc(sizeof(float)*n);
+		}
+
+		float **D;
+		D = (float **)malloc(sizeof(float*)*n);
+		for(i=0;i<n;++i){
+			D[i] = (float*)malloc(sizeof(float)*n);
+		}
+
+		jacobi_eig(x,U,D,n);
+
+		//-------------------------------------------
+		//	[ignore,maxind] = max(abs(U),[],1);
+		//	negloc = (U(maxind + (0:n:(m-1)*n)) < 0);
+		//	U(:,negloc) = -U(:,negloc);
+		//-------------------------------------------
+
+
+		//-------------------------------------------
+		//	D = diag(D);
+		//	tol = eps(max(D)) * length(D);
+		//	t = (abs(D) > tol);
+		//	D = D(t);
+		//	p = sum(D<0); % number of negative eigenvalues
+		//	T = diag(sqrt(D)) * U(:,t)'
+		//-------------------------------------------
+
+		double tmp;
+
+		float *diagD = 	(float*)malloc(sizeof(float)*n);
+		int *t = (int*)malloc(sizeof(int)*n);
+
+		float TOL = 1e-8;
+
+		for(i=0;i<n;++i){
+			diagD[i] = D[i][i];
+		}
+
+		// these two can be merged
+		for(i=0;i<n;++i){
+			t[i] = (fabs(diagD[i]) > TOL) ? 1:0;
+		}	
+
+		for(i=0;i<n;++i){
+			diagD[i] = (t[i]==1)? diagD[i]:0.f;	
+		}
+
+		// p should always be 0
+
+		// update D with diagD
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				D[i][j] = (i==j)? sqrt(diagD[i]): 0.f;	
+			}	
+		}
+
+		float **U_t; // transpose of U
+		U_t = (float**)malloc(sizeof(float*)*n);
+		for(i=0;i<n;++i){
+			U_t[i] = (float*)malloc(sizeof(float)*n);
+		}
+
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				U_t[j][i] = U[i][j];
+			}	
+		}
+
+		// matrix multiplication
+		for(i=0;i<n;++i){
+			for(j=0;j<n;++j){
+				tmp = 0.0;	
+				for(k=0;k<n;++k){
+					tmp += D[i][k]*U_t[k][j];
+				}
+				T[i][j] = tmp;
+			}	
+		}
+
+		//free
+		for(i=0;i<n;++i)
+		{
+			free(x[i]);
+			free(D[i]);
+			free(U[i]);
+			free(U_t[i]);
+		}
+		free(x);
+		free(D);
+		free(U);
+		free(U_t);
+		free(diagD);
+		free(t);
+
 	}
 
 
@@ -684,180 +794,233 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 	}
 	free(T);
 
-/*
-	double tmp;
-	//x = sigma+sigma';
-	float **x = (float**) malloc(sizeof(float*)*n);
+}
+
+void jacobi_eig(float **matrix, float **U, float **D, unsigned int n)
+{
+	//-----------------
+	//reference : http://people.sc.fsu.edu/~jburkardt/c_src/jacobi_eigenvalue/jacobi_eigenvalue.c
+	//-----------------
+
+	// U: eigenvectors
+	// D: eigenvalues
+	int iterMax = 1e3;
+	// double TOL = 1e-8;
+	int it_num;
+	int rot_num = 0;
+	int i,j,k,m,l;
+	int p,q;
+	double threshold;
+	double gapq, termp, termq;
+	double h,term;
+	double t,theta;
+	double c,s,tau;
+	double g;
+	double w;
+
+    // a	
+	double **a;
+	a = (double **)malloc(sizeof(double*)*n);
 	for(i=0;i<n;++i){
-		x[i] = (float*) malloc(sizeof(float)*n);
+		a[i] = (double*)malloc(sizeof(double)*n);
 	}
 
+	// pass matrix to a
 	for(i=0;i<n;++i){
 		for(j=0;j<n;++j){
-			x[i][j]	 = (sigma[i][j] + sigma[j][i])/2;
+			a[i][j] = (double)matrix[i][j]; 
 		}	
 	}
-
-
-
-	//------------------------------------
-	// [U,D] = eig(full((sigma+sigma')/2))
-	//------------------------------------
-
-	float **U;
-	U = (float**)malloc(sizeof(float*)*n);
+	// vv
+	double **vv;
+	vv = (double **)malloc(sizeof(double*)*n);
 	for(i=0;i<n;++i){
-		U[i] = (float*)malloc(sizeof(float)*n);
+		vv[i] = (double*)malloc(sizeof(double)*n);
 	}
-
-	float **D;
-	D = (float **)malloc(sizeof(float*)*n);
+	// dd
+	double **dd;
+	dd = (double **)malloc(sizeof(double*)*n);
 	for(i=0;i<n;++i){
-		D[i] = (float*)malloc(sizeof(float)*n);
+		dd[i] = (double*)malloc(sizeof(double)*n);
 	}
 
-	if(loopID == 0 && state==0 && 0){
-		puts("x=");
+
+	double *d = (double*)malloc(sizeof(double)*n);
+	double *bw = (double*)malloc(sizeof(double)*n);
+	double *zw = (double*)malloc(sizeof(double)*n);
+
+	eye_2d_d(vv,n,n);
+	
+	get2ddiag_d(a,d,n,n);
+	
+	copy_1d_d(d,bw,n);
+
+	init_1d_d(zw,n,0.0);
+
+	for(it_num=0; it_num<=iterMax; ++it_num)
+	{
+		if(it_num == iterMax){
+			puts("Warning: jacobi_eig() fails to converge!");
+		}	
+	
+		// sum the triu of input, take sqrt(), devide by 4*n
+		threshold = 0.0;
 		for(i=0;i<n;++i){
-			for(j=0;j<n;++j){
-				printf("%10.5f ",x[i][j]);
-			}	
-			printf("\n");
+			for(j=i+1;j<n;++j){
+				threshold += a[i][j] * a[i][j];	
+			}
 		}
-		PP();
-		exit(1);
-	}
-
-	//jacobi_eig(x,U,D,n);
-	// sort the eigenvalues in increasing order along diagonal
-	//sort_eig(U,D,n);
-
-	PowerMethod(x,U,D,n, loopID, state);
-
-	if(loopID == 1 && state==0 && 1){
-		//check_2d_f(U,n,n);	
-		//check_2d_f(D,n,n);	
-		puts("U=");
-		for(i=0;i<n;++i){
-			for(j=0;j<n;++j){
-				printf("%10.5f ",U[i][j]);
-			}	
-			printf("\n");
-		}
-		puts("D=");
-		for(i=0;i<n;++i){
-			for(j=0;j<n;++j){
-				printf("%10.5f ",D[i][j]);
-			}	
-			printf("\n");
+		threshold = sqrt(threshold)/(double)(4.0*n);
+	
+		if(threshold == 0.0){
+			break;
 		}
 
-		PP();
-		exit(1);
-	}
+		for(p=0;p<n;++p){
+			for(q=p+1;q<n;++q){
+				// up diagonal	
+				gapq = 10.0 * fabs(a[p][q]);
+				termp = gapq + fabs(d[p]);
+				termq = gapq + fabs(d[q]);
+				
+				// annihilate tiny offdiagonal elements.
+				if( it_num>3 && termp == fabs(d[p]) && termq == fabs(d[q]))
+				{
+					a[p][q]	 = 0.f;
+				}
+				else if(threshold <= fabs(a[p][q]))// apply a rotation
+				{
+					h = d[q] - d[p];	
+					term = fabs(h) + gapq;
+					if(term == fabs(h)){
+						t = a[p][q]/h;	
+					}else{
+						theta = 0.5 * h /a[p][q];	
+						t = 1.0/(fabs(theta) + sqrt(1+theta*theta));
+						if(theta<0){
+							t = -t;
+						}
+					}
 
-	//svd(x,u,D,U,n);
+					c = 1.0/sqrt(1.0+t*t);
+					s = t*c;
+					tau = s/(1.0+c);
+					h = t*a[p][q];
 
-	//	printf("D=\n");
-	//	for(i=0;i<n;++i){
-	//		for(j=0;j<n;++j){
-	//			printf("%10.5e \t", D[i][j]);
-	//		}
-	//		printf("\n");
-	//	}
-	//
-	//	printf("U=\n");
-	//	for(i=0;i<n;++i){
-	//		for(j=0;j<n;++j){
-	//			printf("%10.5f \t", U[i][j]);
-	//		}
-	//		printf("\n");
-	//	}
-	//
+					// accumulate corrections to diagonal elements
+					zw[p] = zw[p] - h;                 
+					zw[q] = zw[q] + h;
+					d[p] = d[p] - h;
+					d[q] = d[q] + h;
+					
+					a[p][q] = 0.0;
 
+					//  Rotate, using information from the upper triangle of A only
+					for(j=0;j<p;++j)
+					{
+						g = a[j][p];
+						h = a[j][q];
+						a[j][p] = g - s*(h+g*tau);
+						a[j][q] = h + s*(g-h*tau);
+					}
 
-	//-------------------------------------------
-	//	[ignore,maxind] = max(abs(U),[],1);
-	//	negloc = (U(maxind + (0:n:(m-1)*n)) < 0);
-	//	U(:,negloc) = -U(:,negloc);
-	//-------------------------------------------
+					for (j=p+1;j<q;++j)
+					{
+						g = a[p][j];
+						h = a[j][q];
+						a[p][j] = g - s*(h + g*tau);
+						a[j][q] = h + s*(g - h*tau);
+					}
 
+					for (j=q+1;j<n;++j)
+					{
+						g = a[p][j];
+						h = a[q][j];
+						a[p][j] = g - s*(h+g*tau);
+						a[q][j] = h + s*(g-h*tau);
+					}
 
-	//-------------------------------------------
-	//	D = diag(D);
-	//	tol = eps(max(D)) * length(D);
-	//	t = (abs(D) > tol);
-	//	D = D(t);
-	//	p = sum(D<0); % number of negative eigenvalues
-	//	T = diag(sqrt(D)) * U(:,t)'
-	//-------------------------------------------
-	float *diagD = 	(float*)malloc(sizeof(float)*n);
-	int *t = (int*)malloc(sizeof(int)*n);
+					// Accumulate information in the eigenvector matrix
+					for(j=0;j<n;++j){
+						g = vv[j][p];	
+						h = vv[j][q]; 
+						vv[j][p] = g-s*(h+g*tau);
+						vv[j][q] = h+s*(g-h*tau);
+					}
 
-	float TOL = 1e-8;
+					rot_num++;	
+				}
+				else{}
+			
+			}
+		}
 
-	for(i=0;i<n;++i){
-		diagD[i] = D[i][i];
-	}
+		// 
+		for (i=0;i<n;i++)
+		{
+			bw[i] = bw[i] + zw[i];
+			d[i] = bw[i];
+			zw[i] = 0.0;
+		}
 
-
-	// these two can be merged
-	for(i=0;i<n;++i){
-		t[i] = (fabs(diagD[i]) > TOL) ? 1:0;
 	}	
 
-	for(i=0;i<n;++i){
-		diagD[i] = (t[i]==1)? diagD[i]:0.f;	
-	}
-
-	// p should always be 0
-
-	// update D with diagD
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			D[i][j] = (i==j)? sqrt(diagD[i]): 0.f;	
-		}	
-	}
-
-	float **U_t; // transpose of U
-	U_t = (float**)malloc(sizeof(float*)*n);
-	for(i=0;i<n;++i){
-		U_t[i] = (float*)malloc(sizeof(float)*n);
-	}
-
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			U_t[j][i] = U[i][j];
-		}	
-	}
-
-	// matrix multiplication
-	for(i=0;i<n;++i){
-		for(j=0;j<n;++j){
-			tmp = 0.0;	
-			for(k=0;k<n;++k){
-				tmp += D[i][k]*U_t[k][j];
+	// Ascending sort the eigenvalues and eigenvectors.
+	for (k=0;k<n-1;k++)
+	{
+		m=k;
+		for (l=k+1; l<n;l++){
+			if (d[l] < d[m]){
+				m = l;
 			}
-			C[i][j] = tmp;
+		}
+
+		if ( m!=k ){
+			t    = d[m];
+			d[m] = d[k];
+			d[k] = t;
+			for (i=0; i<n; i++)
+			{
+				w        = vv[i][m];
+				vv[i][m] = vv[i][k];
+				vv[i][k] = w;
+			}
+		}
+	}
+
+
+	// save d[] to D[][]
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			D[i][j] = (i==j)? (float)d[i]: 0.f; 	
+		}	
+	}
+
+	// save vv[] to U[][]
+	for(i=0;i<n;++i){
+		for(j=0;j<n;++j){
+			U[i][j] = (float)vv[i][j]; 
 		}	
 	}
 
 
-	// release
+	// free
 	for(i=0;i<n;++i){
-		free(x[i]);
-		free(D[i]);
-		free(U[i]);
-		free(U_t[i]);
+		free(a[i]);
+		free(vv[i]);
+		free(dd[i]);
 	}
-	free(x);
-	free(D);
-	free(U);
-	free(U_t);
-	free(diagD);
-	free(t);
-*/
+	free(d);
+	free(bw);
+	free(zw);
+	free(a);
+	free(vv);
+	free(dd);
+
 }
+
+
+
 
 void chol(float **sigma, unsigned int n, float **T, int *perr)
 {
@@ -1115,6 +1278,7 @@ void r8mat_mv(unsigned int m, unsigned int n, float **a, float *x, float *y)
 	return;
 }
 
+/*
 void jacobi_eig(float **matrix, float **U, float **D, unsigned int n)
 {
 	// copy x to D 
@@ -1242,6 +1406,7 @@ loop:
 	goto loop1;
 
 }
+*/
 
 void sort_eig(float **U, float **D, unsigned int n)
 {
