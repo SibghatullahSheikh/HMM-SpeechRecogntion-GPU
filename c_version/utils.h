@@ -21,9 +21,24 @@ void check_2d_f(float **array, unsigned int row, unsigned int col);
 
 void check_1d_f(float *array, unsigned int len);
 
+void rand_1d_f(float *a, unsigned int N);
+
+void rand_2d_f(float **a, unsigned int row, unsigned int col);
+
+void randperm_1d(int *a, unsigned int N);
+
 void transpose(float **in, float **out, unsigned int row, unsigned int col);
 
 void symmetrize_f(float **in, unsigned int N);
+
+void normalise_2d_f(float **x, unsigned int row, unsigned int col);
+
+void normalise_1d_f(float *x, unsigned int len);
+
+void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **out);
+
+float norm_square(float **U, unsigned int j, unsigned int rows);
+
 
 
 #ifdef __cplusplus

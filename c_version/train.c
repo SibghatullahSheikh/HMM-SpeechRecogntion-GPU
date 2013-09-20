@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 #include "train.h"
 #include "utils.h"
@@ -29,6 +30,13 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 	{
 		A[i] = (float*) malloc(sizeof(float)*N);
 	}
+	// rand_A
+	float **rand_A = (float**) malloc(sizeof(float*)*N);
+	for(i=0;i<N;++i)
+	{
+		rand_A[i] = (float*) malloc(sizeof(float)*N);
+	}
+
 
 	float **diag_diag_cov = (float**)malloc(sizeof(float*)*D);
 	for(i=0;i<D;++i)
@@ -62,27 +70,49 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 		mu[i] = (float*)malloc(sizeof(float)*N);
 	}
 
+	// mu_ind: randperm index
+	int *mu_ind = (int*)malloc(sizeof(int)*T);
+
 	unsigned int loopID;
+
+	srand(time(NULL));
 
 	for(loopID=0;loopID<15;++loopID)
 	{
-		// printf("loop = %d\n", loopID);
+		printf("loop = %d\n", loopID);
 
 		if(loopID==0) // initialize parameters
 		{
-			prior[0] = 0.555826367548231;
-			prior[1] = 0.384816327750085;
-			prior[2] = 0.0593573047016839;
+			//prior[0] = 0.555826367548231;
+			//prior[1] = 0.384816327750085;
+			//prior[2] = 0.0593573047016839;
 
-			A[0][0]=0.126558246942481;
-			A[0][1]=0.438475341086527;
-			A[0][2]=0.434966411970992;
-			A[1][0]=0.459614415425850;
-			A[1][1]=0.132462410695470;
-			A[1][2]=0.407923173878680;
-			A[2][0]=0.350943345583750;
-			A[2][1]=0.355739578481455;
-			A[2][2]=0.293317075934795;
+			// prior = normalise(rand(N, 1));
+			rand_1d_f(prior,N);
+			normalise_1d_f(prior,N);
+			if(loopID==0 && 0){
+				check_1d_f(prior,N);
+				PP();exit(1);
+			}
+
+
+			//A[0][0]=0.126558246942481;
+			//A[0][1]=0.438475341086527;
+			//A[0][2]=0.434966411970992;
+			//A[1][0]=0.459614415425850;
+			//A[1][1]=0.132462410695470;
+			//A[1][2]=0.407923173878680;
+			//A[2][0]=0.350943345583750;
+			//A[2][1]=0.355739578481455;
+			//A[2][2]=0.293317075934795;
+
+			// A = mk_stochastic(rand(N));
+			rand_2d_f(rand_A,N,N);
+			mk_stochastic_2d_f(rand_A,N,N,A);
+			if(loopID==0 && 0){
+				check_2d_f(A,N,N);
+				PP();exit(1);
+			}
 
 			transpose(observations, observations_t, D, T);
 			// in 	TxD 
@@ -105,12 +135,33 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 				}	
 			}
 
-			mu[0][0]=875;		mu[0][1]=1000;		mu[0][2]=687.5;						
-			mu[1][0]=562.5;		mu[1][1]=1562.5;	mu[1][2]=875;	
-			mu[2][0]=187.5;		mu[2][1]=750;		mu[2][2]=562.5;		
-			mu[3][0]=1375; 		mu[3][1]=875;		mu[3][2]=1562.5;	
-			mu[4][0]=1187.5;	mu[4][1]=1437.5;	mu[4][2]=1062.5; 	
-			mu[5][0]=1625;		mu[5][1]=1187.5;	mu[5][2]=1250;
+			//mu[0][0]=875;		mu[0][1]=1000;		mu[0][2]=687.5;						
+			//mu[1][0]=562.5;		mu[1][1]=1562.5;	mu[1][2]=875;	
+			//mu[2][0]=187.5;		mu[2][1]=750;		mu[2][2]=562.5;		
+			//mu[3][0]=1375; 		mu[3][1]=875;		mu[3][2]=1562.5;	
+			//mu[4][0]=1187.5;	mu[4][1]=1437.5;	mu[4][2]=1062.5; 	
+			//mu[5][0]=1625;		mu[5][1]=1187.5;	mu[5][2]=1250;
+
+			// ind = randperm(size(observations, 2));
+			// mu = observations(:, ind(1:N));   % initialize the mean value
+			randperm_1d(mu_ind,T); // pick the first N column samples
+			for(i=0;i<N;++i){ //cols
+				for(j=0;j<D;++j){ // rows
+					mu[j][i] = observations[j][mu_ind[i]];	
+				}
+			}
+			// debug
+			if(loopID==0 && 0){
+				for(i=0;i<N;++i){
+					printf("%d\n",mu_ind[i]);
+				}
+				puts("mu");
+				check_2d_f(mu,D,N);
+				PP();exit(1);
+			}
+
+
+
 
 			//  word.name="apple01";
 			//	word.prior = prior;			
@@ -150,6 +201,7 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 	free(prior);
 	for(i=0;i<N;++i){
 		free(A[i]);
+		free(rand_A[i]);
 	}
 	for(i=0;i<T;++i){
 		free(observations_t[i]);
@@ -169,10 +221,12 @@ void TRAIN(float **observations, unsigned int featureDim, unsigned int frameNum,
 	}
 
 	free(A);
+	free(rand_A);
 	free(observations_t);
 	free(diag_diag_cov);
 	free(Sigma);
 	free(mu);
+	free(mu_ind);
 }
 
 
@@ -606,11 +660,18 @@ void cholcov(float **sigma, unsigned int row, unsigned int col, float **C, unsig
 	{
 		// find the cholesky-like 
 		printf("Need to work on eig() here!\n");
+		
+		puts("sigma=");
+		check_2d_f(sigma,n,n);
+
 		PP();
 		exit(1);
 	}
 
-	// update C
+
+
+
+	// write results back to C
 	for(i=0;i<n;++i){
 		for(j=0;j<n;++j){
 			C[i][j] = T[i][j];
@@ -1488,20 +1549,6 @@ int sign_d(double x)
 }
 
 
-float norm_square(float **U, unsigned int j, unsigned int rows) 
-{
-	double norm = 0.0;
-	unsigned int i=0;
-	for(i=0;i<rows;++i){
-		norm += U[i][j]*U[i][j];
-	}
-
-	norm = sqrt(norm);
-
-	return (float)norm;
-}
-
-
 
 void pinv(float **U, float **S, float **V, unsigned int n, float **X)
 {
@@ -1763,130 +1810,6 @@ void Backward(float **A, float **B, float **beta, unsigned int N, unsigned int T
 	// release
 	free(beta_B);
 }
-
-void normalise_2d_f(float **x, unsigned int row, unsigned int col)
-{
-	/*
-	   if(nargin < 2)
-	   z = sum(A(:));
-	   z(z==0) = 1;
-	   A = A./z;
-	   else
-	   z = sum(A, dim);
-	   z(z==0) = 1;
-	   A = bsxfun(@rdivide, A, z);
-	   end
-	 */
-
-	// sum, columnwise
-	unsigned int i,j;
-	double sum=0.0;
-	for(i=0;i<row;++i){
-		for(j=0;j<col;++j){
-			sum = sum + x[i][j];
-		}
-	}
-
-	if(sum == 0.0)
-	{
-		printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
-		sum = 1.0;
-	}
-
-	for(i=0;i<row;++i){
-		for(j=0;j<col;++j){
-			x[i][j] /= (float)sum;
-		}
-	}
-
-}
-
-
-void normalise_1d_f(float *x, unsigned int len)
-{
-	unsigned int i;
-	double sum=0.0;
-	for(i=0;i<len;++i){
-		sum += x[i];
-	}
-
-	if(sum ==0.0)
-	{
-		printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
-		sum = 1.0;
-	}
-
-	for(i=0;i<len;++i){
-		x[i] /= (float)sum;
-	}
-
-}
-
-
-void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **out)
-{
-	//  Z = sum(T,2); 
-	//  S = Z + (Z==0);
-
-	unsigned int i,j;
-
-	float **norm;  // row x col
-	norm=(float **)malloc(sizeof(float*)*row);
-	for(i=0;i<row;++i){
-		norm[i] = (float*)malloc(sizeof(float)*col);	
-	}
-
-	float *Z;
-	Z =(float*)malloc(sizeof(float)*row);
-
-	float *Z1;
-	Z1 =(float*)malloc(sizeof(float)*row);
-	init_1d_f(Z1,row,0.f);
-
-	double sum;
-	// sum across row
-	for(i=0;i<row;++i){
-		sum=0.0;    
-		for(j=0;j<col;++j){
-			sum = sum + x[i][j];
-		}
-		Z[i] = (float)sum;
-	}   
-
-	for(i=0;i<row;++i){
-		if(Z[i]==0){
-			Z1[i]=1.0;  
-		}
-	}
-
-	for(i=0;i<row;++i){
-		Z1[i]=Z1[i]+Z[i];   
-	}
-
-	//  norm = repmat(S, 1, size(T,2));
-	//  norm = [S S .. S]
-	for(i=0;i<row;++i){
-		for(j=0;j<col;++j){
-			norm[i][j] = Z1[i];  
-		}
-	}   
-
-	//  T = T ./ norm;
-	for(i=0;i<row;++i){
-		for(j=0;j<col;++j){
-			out[i][j] = x[i][j]/norm[i][j];    
-		}
-	}   
-
-	// release
-	for(i=0;i<row;++i){
-		free(norm[i]);
-	}
-	free(norm);
-	free(Z);
-	free(Z1);
-}
-
 
 
 void EM(float **observations, float *prior, float **A, float **mu, float **B, float ***Sigma, float **alpha, float **beta, unsigned int D, unsigned int N, unsigned int T)
