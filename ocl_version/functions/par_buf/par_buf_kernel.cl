@@ -32,20 +32,31 @@ __kernel void buffer_ocl(__global float *signal, __global float *buffer_sig, con
 
 	// future: work on raidx2-fft
 	// current: only one thread work DFT, where the frameSize = N = NFFT
-	if(lid ==0){
-		int k,n;
-		double xr, xi;
-		for(k=0;k<frameSize;k++){
-			xr = 0.0;   
-			xi = 0.0;   
-			for(n=0;n<frameSize;n++){
-				xr = xr + sm[n]*cos(2.0*M_PI_F*k*n/frameSize); 
-				xi = xi - sm[n]*sin(2.0*M_PI_F*k*n/frameSize); 
-			}
-			fft_out[k+frameid*frameSize].x = (float)xr;
-			fft_out[k+frameid*frameSize].y = (float)xi;
-		}
+	//if(lid ==0){
+	//	int k,n;
+	//	double xr, xi;
+	//	for(k=0;k<frameSize;k++){
+	//		xr = 0.0;   
+	//		xi = 0.0;   
+	//		for(n=0;n<frameSize;n++){
+	//			xr = xr + sm[n]*cos(2.0*M_PI_F*k*n/frameSize); 
+	//			xi = xi - sm[n]*sin(2.0*M_PI_F*k*n/frameSize); 
+	//		}
+	//		fft_out[k+frameid*frameSize].x = (float)xr;
+	//		fft_out[k+frameid*frameSize].y = (float)xi;
+	//	}
+	//}
+
+	int n;
+	double xr, xi;
+	xr = 0.0;   
+	xi = 0.0;   
+	for(n=0;n<frameSize;n++){
+		xr = xr + sm[n]*cos(2.0*M_PI_F*(lid)*n/frameSize); 
+		xi = xi - sm[n]*sin(2.0*M_PI_F*(lid)*n/frameSize); 
 	}
+
+	fft_out[gid] = (float2){(float)xr, (float)xi};
 
 }
 

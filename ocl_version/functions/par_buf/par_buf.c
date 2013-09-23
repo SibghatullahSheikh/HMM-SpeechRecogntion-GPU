@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
 	err |= clSetKernelArg(kernel, 6, sizeof(cl_int), &overlap);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err |= clSetKernelArg(kernel, 7, sizeof(float)*frameSize, NULL);
+	err |= clSetKernelArg(kernel, 7, sizeof(float)*(frameSize+1), NULL);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);} // shared memory
 
 	err |= clSetKernelArg(kernel, 8, sizeof(cl_mem), &d_fft);

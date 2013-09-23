@@ -1,3 +1,6 @@
+file name = apple01.txt
+audio length = 2694
+Bufferring: frameSize=128 	 frameNum= 85
 frame = 0
 3.0340e-03 + i 0.0000e+00
 8.6616e-03 + i -3.1728e-03
