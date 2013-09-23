@@ -127,9 +127,13 @@ int main(int argc, char *argv[])
 	printf("Bufferring: frameSize=%d \t frameNum= %d\n", frameSize, frameNum);
 
     //buffer(sound, frames, lineNum, framesize, overlap, frameNum);
+
 	float *buffer;
 	buffer = (float*)malloc(sizeof(float)*frameSize*frameNum);
 
+	cl_float2 *fft;
+	fft = (cl_float2 *)malloc(sizeof(cl_float2)*frameSize*frameNum);
+	
 
 
 	// opencl
@@ -202,9 +206,11 @@ int main(int argc, char *argv[])
 	// Create the input and output arrays in device memory for our calculation
 	cl_mem d_sound; // lineNum 
 	cl_mem d_buffer; // framesize*frameNum 
+	cl_mem d_fft;
 
 	d_sound	 = clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float)*lineNum,  NULL, NULL);
-	d_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float)*frameSize*frameNum,	NULL, NULL); // final result
+	d_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float)*frameSize*frameNum,	NULL, NULL); 
+	d_fft	 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_float2)*frameSize*frameNum,NULL, NULL); 
 
 	// Write our data set into the input array in device memory
 	err = clEnqueueWriteBuffer(queue, d_sound, CL_TRUE, 0, sizeof(float)*lineNum, sound, 0, NULL, NULL);
@@ -235,6 +241,9 @@ int main(int argc, char *argv[])
 	err |= clSetKernelArg(kernel, 7, sizeof(float)*frameSize, NULL);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);} // shared memory
 
+	err |= clSetKernelArg(kernel, 8, sizeof(cl_mem), &d_fft);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);} 
+
 
 	// Execute the kernel over the entire range of the data set  
 	// err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalSize, &localSize, 0, NULL, NULL);
@@ -246,15 +255,24 @@ int main(int argc, char *argv[])
 	clFinish(queue);
 
 	// Read the results from the device
-	clEnqueueReadBuffer(queue, d_buffer, CL_TRUE, 0, sizeof(float)*frameSize*frameNum, buffer, 0, NULL, NULL);
+	//clEnqueueReadBuffer(queue, d_buffer, CL_TRUE, 0, sizeof(float)*frameSize*frameNum, buffer, 0, NULL, NULL);
+	clEnqueueReadBuffer(queue, d_fft, CL_TRUE, 0, sizeof(cl_float2)*frameSize*frameNum, fft, 0, NULL, NULL);
 
+/*
 	for(i=0;i<frameNum;++i){
 		printf("frame = %d\n", i);
 		for(j=0;j<frameSize;++j){
 			printf("%.4e\n", buffer[i*frameSize+j]);
 		}
 	}
+*/
 
+	for(i=0;i<frameNum;++i){
+		printf("frame = %d\n", i);
+		for(j=0;j<frameSize;++j){
+			printf("%.4e + i %.4e\n", fft[i*frameSize+j].x, fft[i*frameSize+j].y );
+		}
+	}
 
 
 	//--------------------------
@@ -270,6 +288,7 @@ int main(int argc, char *argv[])
 	free(sound);
 	free(buffer);
 	free(kernelSource);
+	free(fft);
 
 
 
