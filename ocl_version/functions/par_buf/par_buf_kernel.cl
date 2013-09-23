@@ -1,3 +1,4 @@
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
 __kernel void buffer_ocl(__global float *signal, __global float *buffer_sig, const unsigned int sigLen, 
 						const int frameSize, const int frameNum, const int offset, const int overlap, 
 						__local  float* sm, __global float2 *fft_out) 
