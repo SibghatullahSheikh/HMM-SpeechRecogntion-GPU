@@ -1,10 +1,92 @@
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
-__kernel void diagcov(__global float *observation, __global float *cov_cl, const int D, const int T, __local float *sm) 
+__kernel void diagcov(__global float *observation_t, __global float *cov_cl, const int D, const int T, volatile __local float *sm) 
 {
+	// sample input is 10x6 
+	// blockdim is (16,16)
+	// griddim is (1,1)
+
+	// each y thread is the column
+	// each x thread is the row
+	
+	size_t x 		= get_local_id(0);
+	size_t y 		= get_local_id(1);
+
+	size_t gx 		= get_global_id(0);
+	size_t gy 		= get_global_id(1);
+
+	float mean;
+	float data;
+
+	int2 blksize={get_local_size(0),get_local_size(1)};
+
+	//--------------------
+	// step 1: find the mean for each column
+	//--------------------
+
+
+	// fetch data from global mem to shared memory[16][16]
+	if(gx<T && gy<D){
+		sm[x*16+y] = data = observation_t[gx*D+gy];	
+	}else{
+		sm[x*16+y] = 0.f;
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE); 
+
+	// reduction on shared memory [16][16]
+	if(x < 8 && y < 8){
+		if (blksize.x >= 16 && blksize.y >= 16) { sm[x*16+y] += sm[(x*16+y)+16*8]; }
+		if (blksize.x >=  8 && blksize.y >=  8) { sm[x*16+y] += sm[(x*16+y)+16*4]; }
+		if (blksize.x >=  4 && blksize.y >=  4) { sm[x*16+y] += sm[(x*16+y)+16*2]; }
+		if (blksize.x >=  2 && blksize.y >=  2) { sm[x*16+y] += sm[(x*16+y)+16*1]; }
+	}
+
+	// each thread update its mean according to the column value of sm[][y]
+	if(x < T){
+		int i;
+		for(i=0;i<D;++i){
+			if(y == i){
+				mean = sm[y]/(float)T;
+				break;
+			}
+		}
+	}
+
+	//--------------------
+	// step 2: find the cov for each column
+	//--------------------
+
+	if(gx<T && gy<D){
+		sm[x*16+y] = (data - mean)*(data - mean);	
+	}else{
+		sm[x*16+y] = 0.f;
+	}
+	barrier(CLK_LOCAL_MEM_FENCE); 
+	// another reduction 
+	if(x < 8 && y < 8){
+		if (blksize.x >= 16 && blksize.y >= 16) { sm[x*16+y] += sm[(x*16+y)+16*8]; }
+		if (blksize.x >=  8 && blksize.y >=  8) { sm[x*16+y] += sm[(x*16+y)+16*4]; }
+		if (blksize.x >=  4 && blksize.y >=  4) { sm[x*16+y] += sm[(x*16+y)+16*2]; }
+		if (blksize.x >=  2 && blksize.y >=  2) { sm[x*16+y] += sm[(x*16+y)+16*1]; }
+	}
+
+	// output result
+	if(x == 0 && y < D){
+		// current D row summation	
+		cov_cl[y*D+y] = sm[y]/(float)(T-1);
+	}
+
+	//if(x == 0 && y < D ){
+	//	cov_cl[x*D+y] = sm[y];
+	//}
+
+}
+
+/*
+
+
 	size_t blkid	= get_group_id(0); // frame id
 	size_t blksize	= get_local_size(0); // frame id
-	size_t lid 		= get_local_id(0);
-	size_t gid 		= get_global_id(0);
 
 
 	float mean;
@@ -88,7 +170,7 @@ __kernel void diagcov(__global float *observation, __global float *cov_cl, const
 		cov_cl[blkid*D+blkid] = sm[0]/(float)(T-1);
 	}
 
-}
+*/
 
 
 

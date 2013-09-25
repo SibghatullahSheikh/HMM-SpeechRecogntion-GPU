@@ -10,7 +10,7 @@
 
 #include "../../ocl_utils/ocl_utils.c"
 
-
+/*
 void fatal(const char *fmt, ...)
 {
 	va_list va;
@@ -29,12 +29,11 @@ static void need_argument(int argc, char *argv[], int argi)
 		fatal("option %s requires one argument.\n", argv[argi]);
 }
 
+*/
 
 void diag_cov(float *input, unsigned int D, unsigned int T, float *result)
 {
-	// input is DxT (6x85)
-	// but think input as input'(TxD), to avoid transpose
-
+	// input is TxD (10x6)
 	unsigned int i,j,m;
 
 	float *means;
@@ -46,21 +45,18 @@ void diag_cov(float *input, unsigned int D, unsigned int T, float *result)
 	for(i=0;i<D;++i){
 		sum = 0.0;
 		for(j=0;j<T;++j){
-			sum = sum + input[i*T+j]; 
+			sum = sum + input[j*D+i]; 
 		}
-		means[i] = (float)(sum/(float)T);
+		means[i] = (float)sum/(float)T;
 	}
 
-
-	// work on the lower triangular part of the matrix
-	// then update the upper part
 
 	for(i=0;i<D;++i){	// target row/column are the diagonal values
 		sum = 0.0;
 		for(m=0;m<T;++m){
-			sum =  sum + (input[i*T+m]-means[i])*(input[i*T+m]-means[i]); 	
+			sum =  sum + (input[m*D+i]-means[i])*(input[m*D+i]-means[i]); 	
 		}		
-		result[i*D+i] = (float)(sum/(float)(T-1));	
+		result[i*D+i] = (float)(sum)/(float)(T-1);	
 	}
 
 	// free 
@@ -77,10 +73,9 @@ int main(int argc, char *argv[])
 	//--------------------------
 	// parse command line option
 	//--------------------------
-	int argi;
-	int D = 6;
-	int T = 100; // speech frames
+	//int argi;
 
+/*
 	srand(time(NULL));
 
 
@@ -116,20 +111,46 @@ int main(int argc, char *argv[])
 
 	T = T_cmd;
 	D = featureDim_cmd;
-
+*/
 
 	//--------------------------
 	// init input 
 	//--------------------------
 	int i,j;
+	int D = 6;
+	int T = 10; // speech frames
 
-	float *observation;
-	observation = (float*)malloc(sizeof(float)*T*D); // DxT
+	float *observation_t;
+	observation_t = (float*)malloc(sizeof(float)*T*D); // DxT
+
+	// DxT
+	float input[60]=
+	{
+	8.1472369e-01,2.7849822e-01,9.5716695e-01,7.9220733e-01,6.7873515e-01,7.0604609e-01,6.9482862e-01, 7.6551679e-01,  7.0936483e-01,  1.1899768e-01,
+	9.0579194e-01,5.4688152e-01,4.8537565e-01,9.5949243e-01,7.5774013e-01,3.1832846e-02,3.1709948e-01, 7.9519990e-01,  7.5468668e-01,  4.9836405e-01,
+	1.2698682e-01,9.5750684e-01,8.0028047e-01,6.5574070e-01,7.4313247e-01,2.7692298e-01,9.5022205e-01, 1.8687260e-01,  2.7602508e-01,  9.5974396e-01,
+	9.1337586e-01,9.6488854e-01,1.4188634e-01,3.5711679e-02,3.9222702e-01,4.6171391e-02,3.4446081e-02, 4.8976440e-01,  6.7970268e-01,  3.4038573e-01,
+	6.3235925e-01,1.5761308e-01,4.2176128e-01,8.4912931e-01,6.5547789e-01,9.7131781e-02,4.3874436e-01, 4.4558620e-01,  6.5509800e-01,  5.8526775e-01,
+	9.7540405e-02,9.7059278e-01,9.1573553e-01,9.3399325e-01,1.7118669e-01,8.2345783e-01,3.8155846e-01, 6.4631301e-01,  1.6261174e-01,  2.2381194e-01,
+	};
+
+
 	for(i=0;i<D;++i){ // row
-		for(j=0;j<T;++j){
-			observation[i*T+j] = (float)rand()/(float)RAND_MAX;
+		for(j=0;j<T;++j){  // col
+			observation_t[j*D+i] = input[i*T+j]; 
 		}
 	}
+
+	// debug
+	puts("observations(transpose)=");
+	for(i=0;i<T;++i){ // row
+		for(j=0;j<D;++j){  // col
+			printf("%.4e ", observation_t[i*D+j]); 
+		}
+		printf("\n");
+	}
+
+
 
 	float *cov_c;
 	cov_c= (float*)malloc(sizeof(float)*D*D);
@@ -139,10 +160,10 @@ int main(int argc, char *argv[])
 	// c version of cov
 	// ------------------
 
-	diag_cov(observation,D,T,cov_c);
+	diag_cov(observation_t,D,T,cov_c);
 
 	//debug
-	puts("c version = ");
+	puts("\nc version = ");
 	for(i=0;i<D;++i){ // row
 		for(j=0;j<D;++j){
 			printf("%.4e ",cov_c[i*D+j]);
@@ -157,6 +178,7 @@ int main(int argc, char *argv[])
 
 	float *cov_cl;
 	cov_cl = (float*)malloc(sizeof(float)*D*D);
+	memset(cov_cl,0,sizeof(float)*D*D);
 
 	// opencl
 	cl_platform_id cpPlatform;        // OpenCL platform
@@ -166,10 +188,13 @@ int main(int argc, char *argv[])
 	cl_program program;               // program
 	cl_kernel kernel;                 // kernel
 
-	size_t globalSize, localSize;
+	size_t globalSize[2], localSize[2];
 	cl_int err;
-	localSize = 256; //256 
-	globalSize = D*256; // DxT
+	localSize[0] = 16; 
+	localSize[1] = 16;
+
+	globalSize[0] = ((localSize[0]+15)/16)*16; 
+	globalSize[1] = ((localSize[1]+15)/16)*16; 
 
 	// read kernel file
 	char *fileName = "par_diagcov_kernel.cl";
@@ -222,55 +247,50 @@ int main(int argc, char *argv[])
 	OCL_CHECK(err);
 
 	// Create the compute kernel in the program we wish to run
-	kernel = clCreateKernel(program, "buffer_ocl", &err);
+	kernel = clCreateKernel(program, "diagcov", &err);
 	OCL_CHECK(err);
 
 	// Create the input and output arrays in device memory for our calculation
-	cl_mem d_sound; // lineNum 
-	cl_mem d_buffer; // framesize*frameNum 
-	cl_mem d_fft;
 
-	d_sound	 = clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float)*lineNum,  NULL, NULL);
-	d_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float)*frameSize*frameNum,	NULL, NULL); 
-	d_fft	 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_float2)*frameSize*frameNum,NULL, NULL); 
+	cl_mem d_observation_t; 
+	cl_mem d_cov_cl;
+
+	d_observation_t = clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float)*D*T, NULL, NULL);
+	d_cov_cl		= clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float)*D*D,	NULL, NULL); 
+
+	// fill buffer 1.2 , not in 1.1
+
+
+
 
 	// Write our data set into the input array in device memory
-	err = clEnqueueWriteBuffer(queue, d_sound, CL_TRUE, 0, sizeof(float)*lineNum, sound, 0, NULL, NULL);
+	err = clEnqueueWriteBuffer(queue, d_observation_t, CL_TRUE, 0, sizeof(float)*D*T, observation_t, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+	err = clEnqueueWriteBuffer(queue, d_cov_cl, CL_TRUE, 0, sizeof(float)*D*D, cov_cl, 0, NULL, NULL);
 	OCL_CHECK(err);
 
 	// Set the arguments to our compute kernel
-	err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &d_sound);
+	err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &d_observation_t);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &d_buffer);
+	err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &d_cov_cl);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err |= clSetKernelArg(kernel, 2, sizeof(cl_uint), &lineNum);
+	err |= clSetKernelArg(kernel, 2, sizeof(cl_int), &D);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err |= clSetKernelArg(kernel, 3, sizeof(cl_int), &frameSize);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err |= clSetKernelArg(kernel, 4, sizeof(cl_int), &frameNum);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err |= clSetKernelArg(kernel, 5, sizeof(cl_int), &offset);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err |= clSetKernelArg(kernel, 6, sizeof(cl_int), &overlap);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err |= clSetKernelArg(kernel, 7, sizeof(float)*(frameSize+1), NULL);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);} // shared memory
-
-	err |= clSetKernelArg(kernel, 8, sizeof(cl_mem), &d_fft);
+	err |= clSetKernelArg(kernel, 3, sizeof(cl_int), &T);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);} 
+
+	err |= clSetKernelArg(kernel, 4, sizeof(float)*256, NULL);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);} // shared memory
 
 
 	// Execute the kernel over the entire range of the data set  
 	// err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalSize, &localSize, 0, NULL, NULL);
 	//err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalSize, &localSize, 0, NULL, &events[4]);
-	err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalSize, &localSize, 0, NULL, NULL);
+	err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalSize, localSize, 0, NULL, NULL);
 	OCL_CHECK(err);
 
 	// Wait for the command queue to get serviced before reading back results
@@ -278,44 +298,35 @@ int main(int argc, char *argv[])
 
 	// Read the results from the device
 	//clEnqueueReadBuffer(queue, d_buffer, CL_TRUE, 0, sizeof(float)*frameSize*frameNum, buffer, 0, NULL, NULL);
-	clEnqueueReadBuffer(queue, d_fft, CL_TRUE, 0, sizeof(cl_float2)*frameSize*frameNum, fft, 0, NULL, NULL);
+	clEnqueueReadBuffer(queue, d_cov_cl, CL_TRUE, 0, sizeof(float)*D*D, cov_cl, 0, NULL, NULL);
 
-
-	for(i=0;i<frameNum;++i){
-		printf("frame = %d\n", i);
-		for(j=0;j<frameSize;++j){
-			printf("%.4e\n", buffer[i*frameSize+j]);
+	puts("\nGPU result=");
+	for(i=0;i<D;++i){
+		for(j=0;j<D;++j){
+			printf("%.4e ", cov_cl[i*D+j]);
 		}
-	}
-
-
-	for(i=0;i<frameNum;++i){
-		printf("frame = %d\n", i);
-		for(j=0;j<frameSize;++j){
-			printf("%.4e + i %.4e\n", fft[i*frameSize+j].x, fft[i*frameSize+j].y );
-		}
+		printf("\n");
 	}
 
 
 	//--------------------------
 	// free space 
 	//--------------------------
-	clReleaseMemObject(d_buffer);
-	clReleaseMemObject(d_sound);
+	clReleaseMemObject(d_observation_t);
+	clReleaseMemObject(d_cov_cl);
+
 	clReleaseProgram(program);
 	clReleaseKernel(kernel);
 	clReleaseCommandQueue(queue);
 	clReleaseContext(context);
 
-	*/
-	free(observation);
+	free(observation_t);
 	free(cov_c);
 	free(cov_cl);
-	//free(kernelSource);
-	//free(fft);
+	free(kernelSource);
 
 
-		return 0;
+	return 0;
 }
 
 /*
