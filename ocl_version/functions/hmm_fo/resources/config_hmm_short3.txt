@@ -1,0 +1,40 @@
+# HMM generated from MATLAB
+
+# Number of states
+3
+
+# Number of possible symbols
+2
+
+# Initial state probability matrix (Pi)
+0.400000 0.300000 0.300000 
+
+# State transistion probability matrix (A)
+0.800000 0.100000 0.100000 
+0.100000 0.800000 0.100000 
+0.100000 0.100000 0.800000 
+
+# State output probability (B)
+0.900000 0.100000 
+0.100000 0.900000 
+0.500000 0.500000 
+
+# Data matrix dimensions (down, across)
+15 1
+
+# Observation sequence
+0
+0
+0
+0
+0
+1
+1
+1
+1
+1
+0
+1
+0
+1
+0
