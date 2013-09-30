@@ -2,78 +2,49 @@
 #include <stdlib.h>
 #include <math.h>
 
-//#include <cuda.h>
-//#include <cutil.h>
-//#include "/usr/local/cuda/include/cublas.h"
-
 #include "hmm.h"
+#include "../../ocl_utils/ocl_utils.c"
+
 
 extern "C" {         
 #include "hmm_fo.h"
 }
 
-#define EXIT_ERROR     1.0f  
 
 enum {
 	MAX_THREADS_PER_BLOCK = 256
 };
 
 
-
-//  Kernels
- 
-
-/* Initialize alpha variables */
-__global__ void init_alpha_dev( float *b_d,
-		float *pi_d,
-		int nstates,
-		float *alpha_d,
-		float *ones_d,
-		int obs_t)
+char *read_kernel_file(char *fileName)
 {
-	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx < nstates) {
-		alpha_d[idx] = pi_d[idx] * b_d[(obs_t * nstates) + idx];
-		ones_d[idx] = 1.0f;
+	char *kernelSource;
+	size_t size;
+	FILE *fh = fopen(fileName, "rb");
+	if(!fh) {
+		printf("Error: Failed to open kernel file!\n");
+		exit(1);
 	}
+	fseek(fh,0,SEEK_END);
+	size=ftell(fh);
+	fseek(fh,0,SEEK_SET);
+	kernelSource = malloc(size+1);
+	size_t result;
+	result = fread(kernelSource,1,size,fh);
+	if(result != size){ fputs("Reading error", stderr);exit(1);}
+	kernelSource[size] = '\0';
+
+	return kernelSource;	
 }
-
-
-
-
-
-
-
-/* Calculate alpha variables */
-__global__ void calc_alpha_dev( int nstates,
-		float *alpha_t_d,
-		float *b_d,
-		int obs_t)
-{
-	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx < nstates) {
-		alpha_t_d[idx] = alpha_t_d[idx] * b_d[(obs_t * nstates) + idx];
-	}
-}
-
-/* Scale alpha values */
-__global__ void scale_alpha_dev( int nstates, float *alpha_t_d, float scale)
-{
-	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx < nstates) {
-		alpha_t_d[idx] = alpha_t_d[idx] / scale;
-	}
-}
-
 
 
 float run_hmm_fo(Hmm *in_hmm, Obs *in_obs)
 {
-	/* Host-side variables */
+	// Host-side variables
 	int size;
+	int t;
+	float log_lik;
+
 	float *scale;
 	float *a = in_hmm->a;
 	float *b = in_hmm->b;
@@ -82,141 +53,148 @@ float run_hmm_fo(Hmm *in_hmm, Obs *in_obs)
 	int nstates = in_hmm->nstates;
 	int *obs = in_obs->data;
 	int length = in_obs->length;
-	int threads_per_block;
-	int nblocks;
-	int t;
-	float log_lik;
 
-	/* Device-side variables */
-	float *a_d;
-	float *b_d;
-	float *pi_d;
-	float *obs_d;
-	float *alpha_d;             /* All alpha variables */
-	float *alpha_t_d;           /* nstate alpha values at time t */
-	float *ones_d;
+	int err;
 
-
-	/* Allocate host memory */
+	// Allocate host memory
 	scale = (float *) malloc(sizeof(float) * length);
 	if (scale == 0) {
 		fprintf (stderr, "ERROR: Host memory allocation error (scale)\n");
-		return EXIT_ERROR;
+		exit(1);
 	}
 
-	/* Allocate device memory */
-	size = sizeof(float) * nstates * nstates;
-	CUDA_SAFE_CALL( cudaMalloc((void**)&a_d, size) );
+	
+	// --------------------------- opencl --------------------------------//
 
-	CUDA_SAFE_CALL( cudaMemcpy(a_d, a, size, cudaMemcpyHostToDevice) );
-	size = sizeof(float) * nstates * nsymbols;
+	cl_platform_id cpPlatform;        // OpenCL platform
+	cl_device_id device_id;           // device ID
+	cl_context context;               // context
+	cl_command_queue queue;           // command queue
+	cl_program program;               // program
+	cl_kernel kernel[3];                 // kernel
 
-	CUDA_SAFE_CALL( cudaMalloc((void**)&b_d, size) );
-
-	CUDA_SAFE_CALL( cudaMemcpy(b_d, b, size, cudaMemcpyHostToDevice) );
-	size = sizeof(float) * nstates;
-	CUDA_SAFE_CALL( cudaMalloc((void**)&pi_d, size) );
-	CUDA_SAFE_CALL( cudaMemcpy(pi_d, pi, size, cudaMemcpyHostToDevice) );
-	size = sizeof(float) * length;
-	CUDA_SAFE_CALL( cudaMalloc((void**)&obs_d, size) );
-	CUDA_SAFE_CALL( cudaMemcpy(obs_d, obs, size, cudaMemcpyHostToDevice) );
-	size = sizeof(float) * nstates * length;
-	CUDA_SAFE_CALL( cudaMalloc((void**)&alpha_d, size) );
-	size = sizeof(float) * nstates;
-	CUDA_SAFE_CALL( cudaMalloc((void**)&alpha_t_d, size) );
-	size = sizeof(float) * nstates;
-	CUDA_SAFE_CALL( cudaMalloc((void**)&ones_d, size) );
-
-	/* Initialize alpha variables */
-	threads_per_block = MAX_THREADS_PER_BLOCK;
-	nblocks = (nstates + threads_per_block - 1) / threads_per_block;
-	init_alpha_dev<<<nblocks, threads_per_block>>>( b_d,
-			pi_d,
-			nstates,
-			alpha_d,
-			ones_d,
-			obs[0]);
-	size = sizeof(float) * nstates;
-	CUDA_SAFE_CALL( cudaMemcpy( alpha_t_d,
-				alpha_d,
-				size,
-				cudaMemcpyDeviceToDevice) );
+	// read kernel file
+	char *kernelSource = read_kernel_file("hmm_fo_kernel.cl");
 
 
+	// Bind to platform
+	err = clGetPlatformIDs(1, &cpPlatform, NULL);
+	OCL_CHECK(err);
 
+	// Get ID for the device
+	err = clGetDeviceIDs(cpPlatform, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
+	OCL_CHECK(err);
 
+	// Create a context  
+	context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
+	OCL_CHECK(err);
 
-	sGetError();
-	scale[0] = cublasSdot(nstates, alpha_t_d, 1, ones_d, 1);
-	cublas_status = cublasGetError();
+	// Create a command queue 
+	queue = clCreateCommandQueue(context, device_id, 0, &err);
+	OCL_CHECK(err);
 
-	if (cublas_status != CUBLAS_STATUS_SUCCESS) {
-		fprintf (stderr, "ERROR: Kernel execution error\n");
-		return EXIT_ERROR;
+	// Create the compute program from the source buffer
+	program = clCreateProgramWithSource(context, 1, (const char **)&kernelSource, NULL, &err);
+	OCL_CHECK(err);
+
+	// Build the program executable 
+	char *options="-cl-mad-enable -cl-fast-relaxed-math -cl-no-signed-zeros -cl-unsafe-math-optimizations -cl-finite-math-only";
+
+	err = clBuildProgram(program, 1, &device_id, options, NULL, NULL);
+	if(err != CL_SUCCESS){
+		printCompilerOutput(program, device_id);
 	}
+	OCL_CHECK(err);
 
-	/* Scale alpha values */
-	scale_alpha_dev<<<nblocks, threads_per_block>>>(    nstates,
-			alpha_t_d,
-			scale[0]);
+	// Create the compute kernel in the program we wish to run
+	kernel[0] = clCreateKernel(program, "init_alpha_dev", &err);
+	OCL_CHECK(err);
+	//kernel[1] = clCreateKernel(program, "calc_alpha_dev", &err);
+	//OCL_CHECK(err);
+	//kernel[2] = clCreateKernel(program, "scale_alpha_dev", &err);
+	//OCL_CHECK(err);
 
-	/* Copy temporary alpha values back to alpha matrix */
-	CUDA_SAFE_CALL( cudaMemcpy( alpha_d,
-				alpha_t_d,
-				size,
-				cudaMemcpyDeviceToDevice) );
 
-	/* Initialize log likelihood */
-	log_lik = log10(scale[0]);
+	// Allocate device memory
+	cl_mem a_d; // nstates x nstates
+	a_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*nstates*nstates, NULL, err);	
+	OCL_CHECK(err);
 
-	/* Calculate the rest of the alpha variables */
-	for (t = 1; t < length; t++) {
+	cl_mem b_d;
+	b_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*nstates*nsymbols, NULL, err);	
+	OCL_CHECK(err);
 
-		/* Multiply transposed A matrix by alpha(t-1) */
-		/* Note: the matrix is auto-transposed by cublas reading column major */
-		cublasSgemv( 'N', nstates, nstates, 1.0f, a_d, nstates, alpha_t_d, 1, 0,
-				alpha_t_d, 1);
-		cublas_status = cublasGetError();
-		if (cublas_status != CUBLAS_STATUS_SUCCESS) {
-			fprintf (stderr, "ERROR: Kernel execution error\n");
-			return EXIT_ERROR;
-		}
+	cl_mem pi_d;
+	pi_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*nstates, NULL, err);	
+	OCL_CHECK(err);
 
-		/* Calculate alpha(t) */
-		calc_alpha_dev<<<nblocks, threads_per_block>>>( nstates,
-				alpha_t_d,
-				b_d,
-				obs[t]);
+	cl_mem obs_d;
+	obs_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*length, NULL, err);	
+	OCL_CHECK(err);
 
-		/* Sum alpha values to get scaling factor */
-		scale[t] = cublasSdot(nstates, alpha_t_d, 1, ones_d, 1);
-		cublas_status = cublasGetError();
-		if (cublas_status != CUBLAS_STATUS_SUCCESS) {
-			fprintf (stderr, "ERROR: Kernel execution error\n");
-			return EXIT_ERROR;
-		}
+	cl_mem alpha_d;
+	alpha_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*nstates*length, NULL, err);	
+	OCL_CHECK(err);
 
-		/* Scale alpha values */
-		scale_alpha_dev<<<nblocks, threads_per_block>>>(    nstates,
-				alpha_t_d,
-				scale[t]);
+	cl_mem alpha_t_d;// nstate alpha values at time t 
+	alpha_t_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*nstates, NULL, err);	
+	OCL_CHECK(err);
 
-		/* Copy temporary alpha values back to alpha matrix */
-		CUDA_SAFE_CALL( cudaMemcpy( alpha_d + (t * nstates),
-					alpha_t_d,
-					size,
-					cudaMemcpyDeviceToDevice) );
+	cl_mem ones_d;
+	ones_d = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float)*nstates, NULL, err);	
+	OCL_CHECK(err);
 
-		/* Update log likelihood */
-		log_lik += log10(scale[t]);
-	}
 
-	/* Free device memory */
-	CUDA_SAFE_CALL( cudaFree(a_d) );
-	CUDA_SAFE_CALL( cudaFree(b_d) );
-	CUDA_SAFE_CALL( cudaFree(pi_d) );
-	CUDA_SAFE_CALL( cudaFree(obs_d) );
-	CUDA_SAFE_CALL( cudaFree(alpha_d) );
+	// copy host to device
+	err = clEnqueueWriteBuffer(queue, a_d, CL_TRUE, 0, sizeof(float)*nstates*nstates, a, 0, NULL, NULL);
+	OCL_CHECK(err);
+	err = clEnqueueWriteBuffer(queue, b_d, CL_TRUE, 0, sizeof(float)*nstates*nsymbols, b, 0, NULL, NULL);
+	OCL_CHECK(err);
+	err = clEnqueueWriteBuffer(queue, pi_d, CL_TRUE, 0, sizeof(float)*nstates, pi, 0, NULL, NULL);
+	OCL_CHECK(err);
+	err = clEnqueueWriteBuffer(queue, obs_d, CL_TRUE, 0, sizeof(float)*length, obs, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+
+
+	// Initialize alpha variables 
+	localSize = MAX_THREADS_PER_BLOCK;
+	globalSize= ((nstates + localSize - 1)/localSize)*localSize;
+
+	// Set the arguments to compute kernel[0]
+	err  = clSetKernelArg(kernel[0], 0, sizeof(cl_mem), &b_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[0], 1, sizeof(cl_mem), &pi_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[0], 2, sizeof(int), &nstates);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[0], 3, sizeof(cl_mem), &alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[0], 4, sizeof(cl_mem), &ones_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[0], 5, sizeof(cl_mem), &obs_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+
+	// kernel 0
+	err = clEnqueueNDRangeKernel(queue, kernel[0], 1, NULL, globalSize, localSize, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+	clFinish(queue);
+
+	// Read the results from the device
+	err = clEnqueueReadBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*nstates, alpha, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+
+	// free host memory
+	free()
+
 
 	return log_lik;
 }

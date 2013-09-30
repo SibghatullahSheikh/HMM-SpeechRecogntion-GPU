@@ -4,7 +4,7 @@
 #include <unistd.h> // getopt
 
 #include "hmm.c"
-#include "hmm_fo.c"
+//#include "hmm_fo.c"
 
 //#include "../main/hmm_test.h"
 //#include "../main/hmm_fo_cublas.h"
@@ -24,21 +24,12 @@ int main(int argc, char *argv[]) {
 	out_hmm = (Hmm *)malloc(sizeof(Hmm));
 	in_obs = (Obs *)malloc(sizeof(Obs));
 
+	in_hmm->nstates = 2;
+	in_hmm->nsymbols = 4;
 
-	while ((c = getopt(argc, argv, "c:n:")) != -1) {
-		switch(c) {
-			case 'c':
-				configfile = optarg;
-				break;
-			case '?':
-				fprintf(stderr, "illegal options\n");
-				exit(EXIT_FAILURE);
-			default:
-				abort();
-		}
-	}
-
-	read_hmm_file(configfile, in_hmm, in_obs, 0);
+	in_hmm->a = (float *)malloc(sizeof(float)*2*2);
+	in_hmm->b = (float *)malloc(sizeof(float)*2*10); 
+/*
 
 	printf("\n");
 	printf("HMM parameters read from file:\n");
@@ -49,6 +40,7 @@ int main(int argc, char *argv[]) {
 	log_lik = run_hmm_fo(in_hmm, in_obs);
 	toc(&timer);
 	printf("Log likelihood: %0.4f\n", log_lik);
+*/
 
 
 	free_vars(in_hmm, in_obs);
