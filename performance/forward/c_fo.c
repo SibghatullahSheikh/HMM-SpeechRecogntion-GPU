@@ -15,6 +15,151 @@ void copy_2d(float **from_array, float **to_array, int row, int col);
 void read_2d(char *file ,float **b, int row ,int col);
 void check_2d_f(float **array, int row, int col);
 
+void read_config(char **files,int job, float **B, float **A, float *prior, int len)
+{
+	// variables
+	int i,j;
+	int N = len;
+
+	// allocate parameters
+	float **b;
+	b = (float**)malloc(sizeof(float*)*N);
+	for(i = 0; i < N; ++i) {
+		b[i] = (float*)malloc(sizeof(float)*N);
+	}
+
+	float **a;
+	a = (float**)malloc(sizeof(float*)*N);
+	for(i = 0; i < N; ++i) {
+		a[i] = (float*)malloc(sizeof(float)*N);
+	}
+
+	float *pri;
+	pri = (float*)malloc(sizeof(float)*N);
+
+
+	for(i = 0; i < 3; ++i){
+		//printf("%s\n",files[job*3+i]);	
+
+		// read B
+		if(i == 0){
+			printf("read B[%d][%d] \t\t", N, N);
+			// read matrix
+			read_2d(files[job*3],b,N,N);
+		
+			//if(job == 0){
+			//	check_2d_f(b,N,N);	
+			//}
+
+			//copy_2d(b,B,N,N);
+
+			printf("done!\n");
+		}
+
+		// read A
+		if(i == 1){
+			printf("read A[%d][%d] \t\t", N, N);
+			printf("done!\n");
+		}
+
+		// read prior
+		if(i == 2){
+			printf("read prior[%d] \t\t", N);
+			printf("done!\n");
+		}
+
+
+	}	
+
+
+
+}
+
+
+int getLineNum(char *file)
+{
+	int lineNum=0;
+	char buffer[BUFSIZE];
+	FILE *fr = fopen(file, "rb");
+	if(fr == NULL) {
+		printf("Can't open %s!\n", file);
+		exit(1);
+	}else{
+		while(fgets(buffer, sizeof(buffer), fr))
+		{
+			lineNum++;
+		}
+		fclose(fr);
+	}
+
+	return lineNum;
+}
+
+
+void read_2d(char *file ,float **b, int row ,int col)
+{
+	int i;
+	int lineNum = 0;
+	char buf[BUFSIZE];
+	char *pch;
+	
+	FILE *fr;
+	fr = fopen(file, "r");
+	if(fr == NULL) {
+		printf("Can't open %s!\n", file);
+		exit(1);
+	}else{
+		while(fgets(buf, BUFSIZE, fr) != NULL)
+		{
+			i = 0;
+			pch =  strtok(buf," ");
+			while(pch != NULL)
+			{
+				//if(i < col){
+					sscanf(pch,"%f", &b[lineNum][i]);
+				//}
+				i++;
+				pch = strtok (NULL, " ,.-");
+
+
+			}
+
+			lineNum++;
+		}
+
+		printf("%d \n",lineNum);
+
+		fclose(fr);
+	}
+
+}
+
+void copy_2d(float **from_array, float **to_array, int row, int col)
+{
+	int i,j;
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			to_array[i][j] = from_array[i][j];
+		}	
+	}
+
+}
+
+
+void check_2d_f(float **array, int row, int col)
+{
+	int i,j;
+	for(i=0;i<row;++i)
+	{
+		for(j=0;j<col;++j)
+		{
+			printf("%10.4e ",array[i][j]);	
+
+		}
+		printf("\n");
+	}
+
+}
 
 int main(int argc, char*argv[])
 {
@@ -57,8 +202,8 @@ int main(int argc, char*argv[])
 		printf("%d\n",Len);
 
 		//read B,A,prior
-		//puts("Read the following files.");
-		//read_config(files,job,B,A,prior,Len);
+		puts("Read the following files.");
+		read_config(files,job,B,A,prior,Len);
 
 
 	}
@@ -70,161 +215,4 @@ int main(int argc, char*argv[])
 	return 0;
 }
 
-void read_config(char **files,int job, float **B, float **A, float *prior, int len)
-{
-	// variables
-	int i,j;
-	int N = len;
-
-	// allocate parameters
-	float **b;
-	b = (float**)malloc(sizeof(float*)*N);
-	for(i = 0; i < N; ++i) {
-		b[i] = (float*)malloc(sizeof(float)*N);
-	}
-
-	float **a;
-	a = (float**)malloc(sizeof(float*)*N);
-	for(i = 0; i < N; ++i) {
-		a[i] = (float*)malloc(sizeof(float)*N);
-	}
-
-	float *pri;
-	pri = (float*)malloc(sizeof(float)*N);
-
-
-	for(i = 0; i < 3; ++i){
-		//printf("%s\n",files[job*3+i]);	
-
-		// read B
-		if(i == 0){
-			printf("read B[%d][%d] \t\t", N, N);
-			// read matrix
-			read_2d(files[job*3+i],b,N,N);
-			
-			//if(job == 0){
-			//	check_2d_f(b,N,N);	
-			//}
-
-			//copy_2d(b,B,N,N);
-
-			printf("done!\n");
-		}
-
-		// read A
-		if(i == 1){
-			printf("read A[%d][%d] \t\t", N, N);
-			printf("done!\n");
-		}
-
-		// read prior
-		if(i == 2){
-			printf("read prior[%d] \t\t", N);
-			printf("done!\n");
-		}
-
-
-	}	
-
-
-	// de-allocate
-	free(pri);
-	for(i=0;i<N;++i){
-		free(a[i]);
-		free(b[i]);
-	}
-	free(a);
-	free(b);
-
-}
-
-
-int getLineNum(char *file)
-{
-	int lineNum=0;
-	char buffer[BUFSIZE];
-	FILE *fr = fopen(file, "rb");
-	if(fr == NULL) {
-		printf("Can't open %s!\n", file);
-		exit(1);
-	}else{
-		while(fgets(buffer, sizeof(buffer), fr))
-		{
-			lineNum++;
-		}
-		fclose(fr);
-	}
-
-	return lineNum;
-}
-
-
-void read_2d(char *file ,float **b, int row ,int col)
-{
-	int i;
-	int lineNum = 0;
-	char buf[BUFSIZE];
-	char *pch;
-	
-	FILE *fr;
-	fr = fopen(file, "rb");
-	if(fr == NULL) {
-		printf("Can't open %s!\n", file);
-		exit(1);
-	}else{
-		while(fgets(buf, BUFSIZE, fr) != NULL)
-		{
-			i = 0;
-			pch =  strtok(buf," ");
-			while(pch != NULL)
-			{
-				sscanf(pch,"%f", &b[lineNum][i]);
-				i++;
-				pch = strtok (NULL, " ,.-");
-
-
-			}
-
-			/*
-			int i;
-			for(i=0;i<col;++i){
-				strcat(format,"%f ");
-			}	
-
-			sscanf(buf,format, );
-			*/
-
-			lineNum++;
-		}
-		fclose(fr);
-	}
-
-}
-
-void copy_2d(float **from_array, float **to_array, int row, int col)
-{
-	int i,j;
-	for(i=0;i<row;++i){
-		for(j=0;j<col;++j){
-			to_array[i][j] = from_array[i][j];
-		}	
-	}
-
-}
-
-
-void check_2d_f(float **array, int row, int col)
-{
-	int i,j;
-	for(i=0;i<row;++i)
-	{
-		for(j=0;j<col;++j)
-		{
-			printf("%10.4e ",array[i][j]);	
-
-		}
-		printf("\n");
-	}
-
-}
 
