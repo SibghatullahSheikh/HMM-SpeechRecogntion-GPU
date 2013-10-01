@@ -36,6 +36,8 @@ void check_b(HMM *word);
 
 void check_pri(HMM *word);
 
+void check_2d_f(float **x, int row, int col);
+
 void free_hmm(HMM *word);
 
 void start(struct timeval *timer);
@@ -43,6 +45,8 @@ void start(struct timeval *timer);
 void end(struct timeval *timer);
 
 void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2);
+
+void transpose(float **A, float **A_t, int N);
 
 
 
@@ -115,14 +119,87 @@ int main(int argc, char*argv[])
 		//----------------------
 		// run forward algorithm
 		//----------------------
-		
-		start(&timer);
+		int i,j,k;
+		int N = word->nstates;
+		int T = word->len;
+		float **B = word->b;
+		float **A = word->a;
+		float *prior = word->pri;
 
+		double tmp, alpha_sum;
+		double log_likelihood;
+
+		float **alpha;
+		alpha = (float**)malloc(sizeof(float*)*N);
+		for(i=0;i<N;++i){
+			alpha[i] = (float*)malloc(sizeof(float)*T);
+		}
+		
+
+
+		float **A_t;
+		A_t = (float**)malloc(sizeof(float*)*N);
+		for(i=0;i<N;++i){
+			A_t[i] = (float*)malloc(sizeof(float)*N);
+		}
+
+		transpose(A, A_t, N);
+		if(job == 0 && debug){
+			puts("Transpose A");
+			check_2d_f(A_t,N,N);
+		}
+		
+	
+		// start Foward
+		start(&timer);
+		
+		log_likelihood = 0.0;
+		for(j=0;j<T;++j)
+		{
+			alpha_sum = 0.0;
+
+			if(j==0){ // initialize
+				for(i=0;i<N;++i){
+					alpha[i][0] = B[i][0] * prior[i];	
+					alpha_sum += alpha[i][0];
+				}
+			}else{ // move forward
+				for(i=0;i<N;++i)
+				{ // go through each state
+					tmp = 0.0;	
+					for(k=0;k<N;++k){
+						tmp += A_t[i][k] * alpha[k][j-1];
+					}
+
+					alpha[i][j] = (float)tmp * B[i][j];
+					alpha_sum += alpha[i][j];
+				}
+			}
+
+			// scaling
+			for(i=0;i<N;++i){			
+				alpha[i][j] /= alpha_sum;
+			}
+
+			log_likelihood += log(alpha_sum);
+		}
 
 		end(&timer);
+		// end Forward
+
+		printf("log_likelihood = %lf\n", log_likelihood);
+
+
 
 		// free memory
 		free_hmm(word);
+		for(i=0;i<N;++i){
+			free(A_t[i]);
+			free(alpha[i]);
+		}
+		free(A_t);
+		free(alpha);
+
 	}
 
 
@@ -404,4 +481,31 @@ void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2)
 	tdiff->tv_usec = diff%1000000;
 }
 
+
+void transpose(float **A, float **A_t, int N)
+{
+	int i,j;
+	for(i=0;i<N;++i){
+		for(j=0;j<N;++j){
+			A_t[j][i] = A[i][j];
+		}	
+	}
+
+}
+
+void check_2d_f(float **x, int row, int col)
+{
+	int i,j;
+
+	for(i=0;i<row;++i)
+	{
+		printf("row(%d)\n",i);
+		for(j=0;j<col;++j)
+		{
+			printf("%10.4e\n",x[i][j]);	
+
+		}
+		printf("\n\n");
+	}
+}
 
