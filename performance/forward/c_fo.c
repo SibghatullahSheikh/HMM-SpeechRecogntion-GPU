@@ -3,14 +3,10 @@
 #include <string.h>
 #include <math.h>
 #include <string.h>
-//#include <time.h>
+#include <time.h>
 #include <sys/time.h>
 
 #define BUFSIZE 1000000
-
-//float **b;
-//float **a;
-//float *pri;
 
 typedef struct{
 	float **b;
@@ -42,13 +38,104 @@ void check_pri(HMM *word);
 
 void free_hmm(HMM *word);
 
+void start(struct timeval *timer);
+
+void end(struct timeval *timer);
+
+void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2);
 
 
 
 
+//-----------------------------------------------------------
+//
+// Main Function	
+//
+//-----------------------------------------------------------
+
+int main(int argc, char*argv[])
+{
+	// 6 config, each has three files to read
+	char *files[] = {
+		"../resources/config_32N32M_B.txt",
+		"../resources/config_32N32M_A.txt",
+		"../resources/config_32N32M_prior.txt",
+		"../resources/config_64N64M_B.txt",
+		"../resources/config_64N64M_A.txt",
+		"../resources/config_64N64M_prior.txt",
+		"../resources/config_128N128M_B.txt",
+		"../resources/config_128N128M_A.txt",
+		"../resources/config_128N128M_prior.txt",
+		"../resources/config_256N256M_B.txt",
+		"../resources/config_256N256M_A.txt",
+		"../resources/config_256N256M_prior.txt",
+		"../resources/config_512N512M_B.txt",
+		"../resources/config_512N512M_A.txt",
+		"../resources/config_512N512M_prior.txt",
+		"../resources/config_1024N1024M_B.txt",
+		"../resources/config_1024N1024M_A.txt",
+		"../resources/config_1024N1024M_prior.txt",
+	};
+
+	// variables
+	int job;
+	int Len;
+	int debug=0;
+	
+	struct timeval timer;
 
 
-//void read_config(char **files,int job, float **b, float **a, float *pri, int len)
+
+	
+	for(job = 0 ; job < 6 ; ++job){
+		HMM *word;
+		word = (HMM*)malloc(sizeof(HMM));
+
+		printf("\n\njob (%d) => ", job);
+
+		Len = getLineNum(files[job*3+2]);	
+		printf("%d\n",Len);
+
+		//read B,A,prior
+		puts("Read the following files.");
+
+		//read_config(files,job,B,A,prior,Len);
+		read_config(word,files,job,Len);
+
+		if( debug && job == 0 ) {
+			puts("a");
+			check_a(word);	
+			puts("b");
+			check_b(word);	
+			puts("pri");
+			check_pri(word);	
+		}
+
+
+		//----------------------
+		// run forward algorithm
+		//----------------------
+		
+		start(&timer);
+
+
+		end(&timer);
+
+		// free memory
+		free_hmm(word);
+	}
+
+
+	return 0;
+}
+
+
+//-----------------------------------------------------------
+//
+//	Utility Functions
+//
+//-----------------------------------------------------------
+
 void read_config(HMM* word, char **files,int job, int len)
 {
 	// variables
@@ -296,73 +383,25 @@ void free_hmm(HMM *word)
 
 }
 
-
-
-
-
-int main(int argc, char*argv[])
+void start(struct timeval *timer)
 {
-	// 6 config, each has three files to read
-	char *files[] = {
-		"../resources/config_32N32M_B.txt",
-		"../resources/config_32N32M_A.txt",
-		"../resources/config_32N32M_prior.txt",
-		"../resources/config_64N64M_B.txt",
-		"../resources/config_64N64M_A.txt",
-		"../resources/config_64N64M_prior.txt",
-		"../resources/config_128N128M_B.txt",
-		"../resources/config_128N128M_A.txt",
-		"../resources/config_128N128M_prior.txt",
-		"../resources/config_256N256M_B.txt",
-		"../resources/config_256N256M_A.txt",
-		"../resources/config_256N256M_prior.txt",
-		"../resources/config_512N512M_B.txt",
-		"../resources/config_512N512M_A.txt",
-		"../resources/config_512N512M_prior.txt",
-		"../resources/config_1024N1024M_B.txt",
-		"../resources/config_1024N1024M_A.txt",
-		"../resources/config_1024N1024M_prior.txt",
-	};
-
-	// variables
-	int job;
-	int Len;
-
-	int debug=1;
-
-	
-	for(job = 0 ; job < 6 ; ++job){
-		HMM *word;
-		word = (HMM*)malloc(sizeof(HMM));
-
-		printf("\n\njob (%d) => ", job);
-
-		Len = getLineNum(files[job*3+2]);	
-		printf("%d\n",Len);
-
-		//read B,A,prior
-		puts("Read the following files.");
-		//read_config(files,job,B,A,prior,Len);
-		read_config(word,files,job,Len);
-
-		if( debug && job == 0 ) {
-			puts("a");
-			check_a(word);	
-			puts("b");
-			check_b(word);	
-			puts("pri");
-			check_pri(word);	
-		}
-
-		// free memory
-		free_hmm(word);
-	}
+	gettimeofday(timer, NULL);
+}
 
 
+void end(struct timeval *timer)
+{
+	struct timeval tend, tdiff;
+	gettimeofday(&tend, NULL);
+	timeval_diff(&tdiff, timer, &tend);
+	printf("Elapsed Time = %ld.%06ld(s)\n",tdiff.tv_sec, tdiff.tv_usec);
+}
 
-
-
-	return 0;
+void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2)
+{
+	long int diff = (t2->tv_usec + 1000000*t2->tv_sec) - (t1->tv_usec + 1000000*t1->tv_sec);
+	tdiff->tv_sec  = diff/1000000;
+	tdiff->tv_usec = diff%1000000;
 }
 
 
