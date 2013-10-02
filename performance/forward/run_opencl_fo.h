@@ -47,6 +47,8 @@ void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2)
 
 void transpose(float *A, float *A_t, int row, int col);
 
+void init_2d_f(float *frames, int row, int col, float val);
+
 
 
 

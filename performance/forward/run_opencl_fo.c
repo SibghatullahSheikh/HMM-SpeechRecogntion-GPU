@@ -25,9 +25,15 @@ void run_opencl_fo(HMM *word)
 	double tmp, alpha_sum;
 	double log_likelihood;
 
-	float *A_t; // NxN
-	A_t = (float*)malloc(sizeof(float)*N*N);
+	float *At; // NxN
+	At = (float*)malloc(sizeof(float)*N*N);
 
+	// initialize for checking
+	float *alpha;
+	alpha = (float*)malloc(sizeof(float)*N*T);
+	init_2d_f(alpha,N,T,0.f);
+
+	
 
 	//------------------------------------------------
 	// 	OpenCL 
@@ -37,11 +43,12 @@ void run_opencl_fo(HMM *word)
 	cl_context context;               // context
 	cl_command_queue queue;           // command queue
 	cl_program program;               // program
+
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*4);
+	cl_event *event = (cl_event*)malloc(sizeof(cl_event)*4);	// create events for profiling and concurrent cmdqueue
 
 	cl_int err;
 
-/*
 	// read kernel file
 	char *fileName = "ocl_fo_kernel.cl";
 	char *kernelSource;
@@ -113,9 +120,6 @@ void run_opencl_fo(HMM *word)
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 
-	// create events for profiling and concurrent cmdqueue
-	cl_event *event = (cl_event*)malloc(sizeof(cl_event)*4);
-
 	// 2D transpose
 	size_t local_1[2];
 	size_t global_1[2];
@@ -128,16 +132,15 @@ void run_opencl_fo(HMM *word)
 	OCL_CHECK(err);
 
 
-	if(job == 0 ){
+	if(0){
 		clFinish(queue);
-		clEnqueueReadBuffer(queue, At_d, CL_TRUE, 0, sizeof(float)*N*N, A_t, 0, NULL, NULL);
+		clEnqueueReadBuffer(queue, At_d, CL_TRUE, 0, sizeof(float)*N*N, At, 0, NULL, NULL);
 		puts("Transpose A");
-		check_2d_f(A_t,N,N);
+		check_2d_f(At,N,N);
 	}
 
 	// time capsule
 	int frame;
-
 
 	//---------------------------------------	
 	// initial alpha:  B x Prior 
@@ -148,18 +151,17 @@ void run_opencl_fo(HMM *word)
 
 	err = clEnqueueWriteBuffer(queue, prior_d, CL_TRUE, 0, sizeof(float)*N, prior, 0, NULL, NULL);
 	err = clEnqueueWriteBuffer(queue, B_d, CL_TRUE, 0, sizeof(float)*N*T, B, 0, NULL, NULL);
+	err = clEnqueueWriteBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*N*T, alpha, 0, NULL, NULL); // checking alpha
 
 	err  = clSetKernelArg(kernel[1], 0, sizeof(cl_mem), &B_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[1], 1, sizeof(cl_mem), &prior_d);
+	err = clSetKernelArg(kernel[1], 1, sizeof(cl_mem), &prior_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[1], 2, sizeof(cl_mem), &alpha_d);
+	err = clSetKernelArg(kernel[1], 2, sizeof(cl_mem), &alpha_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[1], 3, sizeof(int), 	&N);
+	err = clSetKernelArg(kernel[1], 3, sizeof(int), 	&N);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[1], 4, sizeof(int), 	&T);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[1], 5, sizeof(int), 	&frame);
+	err = clSetKernelArg(kernel[1], 4, sizeof(int), 	&T);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 	size_t local_2 = 64;
@@ -168,10 +170,14 @@ void run_opencl_fo(HMM *word)
 	for(frame = 0 ; frame < T; ++frame)
 	{
 
+		err = clSetKernelArg(kernel[1], 5, sizeof(int), 	&frame);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
 		if(frame == 0){ // initialize
 			err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, &event[1]);
 			OCL_CHECK(err);
-			if(job == 0 && 0){
+			if(1){
+				clFinish(queue);
 				clEnqueueReadBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*N*T, alpha, 0, NULL, NULL);
 				puts("Alpha");
 				check_2d_f(alpha,N,T);
@@ -187,16 +193,14 @@ void run_opencl_fo(HMM *word)
 
 
 
-	//clReleaseMemObject(A_d);
-	//clReleaseMemObject(At_d);
-	//clReleaseMemObject(prior_d);
-	//clReleaseMemObject(B_d);
-	//clReleaseMemObject(alpha_d);
-
-*/
+	clReleaseMemObject(A_d);
+	clReleaseMemObject(At_d);
+	clReleaseMemObject(prior_d);
+	clReleaseMemObject(B_d);
+	clReleaseMemObject(alpha_d);
 
 
-	clFinish(queue);
+
 
 	clReleaseProgram(program);
 	clReleaseContext(context);
@@ -205,8 +209,9 @@ void run_opencl_fo(HMM *word)
 		clReleaseKernel(kernel[i]);
 	}
 
-	//free(kernelSource);
-	free(A_t);
+	free(kernelSource);
+	free(At);
+	free(alpha);
 
 	return;
 }
@@ -502,3 +507,15 @@ void check_2d_f(float *x, int row, int col)
 	}
 }
 
+
+void init_2d_f(float *frames, int row, int col, float val)
+{
+	int i,j;
+	for(i=0;i<row;++i)
+	{
+		for (j=0;j<col;++j)
+		{
+			frames[i*col + j] = val;			
+		}
+	}
+}

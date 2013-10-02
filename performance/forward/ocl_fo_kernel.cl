@@ -29,7 +29,7 @@ __kernel void alpha_dev(
 	unsigned int stride = gid*T;
 
 	if (gid < nstates) {
-		alpha_d[startPos + stride] = pi_d[startPos + stride] * b_d[gid];
+		alpha_d[startPos + stride] = b_d[startPos + stride] * pi_d[gid];
 	}
 }
 
