@@ -6,19 +6,18 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define BUFSIZE 1000000
+#include <CL/opencl.h>
 
-typedef struct{
-	float **b;
-	float **a;
-	float *pri;
-	int len;
-	int nstates;
-} HMM;
+#include "../../utils/ocl_utils.c"
+
+#include "run_opencl_fo.h"
+//#include "run_opencl_fo.c"
+
+#define BUFSIZE 1000000
 
 
 //void read_config(char **files,int job, float **b, float **a, float *pri, int len);
-void read_config(HMM* word, char **files,int job,int len);
+void read_config(HMM* word, char **files,int job, int states, int len);
 
 int getLineNum(char *file);
 
@@ -36,7 +35,7 @@ void check_b(HMM *word);
 
 void check_pri(HMM *word);
 
-void check_2d_f(float **x, int row, int col);
+void check_2d_f(float *x, int row, int col);
 
 void free_hmm(HMM *word);
 
@@ -46,7 +45,7 @@ void end(struct timeval *timer);
 
 void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2);
 
-void transpose(float **A, float **A_t, int N);
+void transpose(float *A, float *A_t, int row, int col);
 
 
 
@@ -82,11 +81,12 @@ int main(int argc, char*argv[])
 	};
 
 	// variables
+	int i,j,k;
 	int job;
 	int Len;
 	int debug=0;
 
-	
+
 	for(job = 0 ; job < 6 ; ++job){
 		HMM *word;
 		word = (HMM*)malloc(sizeof(HMM));
@@ -100,8 +100,9 @@ int main(int argc, char*argv[])
 		puts("Read the following files.");
 
 		//read_config(files,job,B,A,prior,Len);
-		read_config(word,files,job,Len);
+		read_config(word,files,job,Len,Len);
 
+		puts("Done!");
 		if( debug && job == 0 ) {
 			puts("a");
 			check_a(word);	
@@ -115,76 +116,64 @@ int main(int argc, char*argv[])
 		//----------------------
 		// run forward algorithm
 		//----------------------
-		int i,j,k;
+
+		//---------------------------
+		// GPU Version
+		//---------------------------
+
+		run_opencl_fo(word);
+
+
+		//---------------------------
+		// CPU Version
+		//---------------------------
+
+		puts("\nCPU");
+
 		int N = word->nstates;
 		int T = word->len;
-		float **B = word->b;
-		float **A = word->a;
+		float *B = word->b;
+		float *A = word->a;
 		float *prior = word->pri;
 
 		double tmp, alpha_sum;
 		double log_likelihood;
 
-		float **alpha;
-		alpha = (float**)malloc(sizeof(float*)*N);
-		for(i=0;i<N;++i){
-			alpha[i] = (float*)malloc(sizeof(float)*T);
-		}
+		float *alpha; // NxT
+		alpha = (float*)malloc(sizeof(float)*N*T);
 
+		float *A_t; // NxN
+		A_t = (float*)malloc(sizeof(float)*N*N);
 
-		float **A_t;
-		A_t = (float**)malloc(sizeof(float*)*N);
-		for(i=0;i<N;++i){
-			A_t[i] = (float*)malloc(sizeof(float)*N);
-		}
+		transpose(A, A_t, N, T);	
 
-		//------------------------------------------------
-		// 	OpenCL 
-		//------------------------------------------------
-
-
-
-
-
-
-
-
-		transpose(A, A_t, N);
-
-		if(job == 0 && debug){
-			puts("Transpose A");
-			check_2d_f(A_t,N,N);
-		}
-		
-	
-		// start Foward
-		
 		log_likelihood = 0.0;
+
 		for(j=0;j<T;++j)
 		{
 			alpha_sum = 0.0;
 
 			if(j==0){ // initialize
 				for(i=0;i<N;++i){
-					alpha[i][0] = B[i][0] * prior[i];	
-					alpha_sum += alpha[i][0];
+					alpha[i*T + 0] = B[i*T + 0] * prior[i];	
+					alpha_sum += alpha[i*T + 0];
 				}
 			}else{ // move forward
 				for(i=0;i<N;++i)
 				{ // go through each state
 					tmp = 0.0;	
 					for(k=0;k<N;++k){
-						tmp += A_t[i][k] * alpha[k][j-1];
+						tmp += A_t[i*N + k] * alpha[k*T + j-1];
 					}
 
-					alpha[i][j] = (float)tmp * B[i][j];
-					alpha_sum += alpha[i][j];
+					alpha[i*T + j] = (float)tmp * B[i*T + j];
+					alpha_sum += alpha[i*T + j];
 				}
 			}
 
 			// scaling
 			for(i=0;i<N;++i){			
-				alpha[i][j] /= alpha_sum;
+				alpha[i*T + j] /= alpha_sum;
 			}
 
 			log_likelihood += log(alpha_sum);
@@ -194,18 +183,13 @@ int main(int argc, char*argv[])
 		printf("log_likelihood = %lf\n", log_likelihood);
 
 
-
 		// free memory
+
 		free_hmm(word);
-		for(i=0;i<N;++i){
-			free(A_t[i]);
-			free(alpha[i]);
-		}
 		free(A_t);
 		free(alpha);
 
 	}
-
 
 	return 0;
 }
@@ -217,55 +201,43 @@ int main(int argc, char*argv[])
 //
 //-----------------------------------------------------------
 
-void read_config(HMM* word, char **files,int job, int len)
+void read_config(HMM* word, char **files,int job, int states, int len)
 {
 	// variables
 	int i;
-	int N = len;
+	int N = states;
+	int T = len;
 
 	word->nstates = N;
-	word->len = N;
+	word->len = T;
 
 
 	// allocate parameters
-	//float **b = word->b;
-	word->b = (float**)malloc(sizeof(float*)*N);
-	for(i = 0; i < N; ++i) {
-		word->b[i] = (float*)malloc(sizeof(float)*N);
-	}
-
-	//float **a = word->a;
-	word->a = (float**)malloc(sizeof(float*)*N);
-	for(i = 0; i < N; ++i) {
-		word->a[i] = (float*)malloc(sizeof(float)*N);
-	}
-
-	//float *pri = word->pri;
+	word->b   = (float*)malloc(sizeof(float)*N*T);
+	word->a   = (float*)malloc(sizeof(float)*N*N);
 	word->pri = (float*)malloc(sizeof(float)*N);
-
 
 	for(i = 0; i < 3; ++i){
 		//printf("%s\n",files[job*3+i]);	
-
 		// read B
 		if(i == 0){
-			printf("read B[%d][%d] \t\t", N, N);
-			read_b(files[job*3],word,N,N);
-			printf("done!\n");
+			//printf("read B[%d][%d] \t\t", N, T);
+			read_b(files[job*3],word,N,T);
+			//printf("done!\n");
 		}
 
 		// read A
 		if(i == 1){
-			printf("read A[%d][%d] \t\t", N, N);
+			//printf("read A[%d][%d] \t\t", N, N);
 			read_a(files[job*3+1],word,N,N);
-			printf("done!\n");
+			//printf("done!\n");
 		}
 
 		// read prior
 		if(i == 2){
-			printf("read prior[%d] \t\t", N);
+			//printf("read prior[%d] \t\t", N);
 			read_pri(files[job*3+2],word,N);
-			printf("done!\n");
+			//printf("done!\n");
 		}
 
 	}	
@@ -297,7 +269,7 @@ void read_pri(char *file ,HMM* word, int len)
 {
 	int lineNum = 0;
 	char buf[100];
-	
+
 	FILE *fr;
 	fr = fopen(file, "r");
 	if(fr == NULL) {
@@ -321,7 +293,7 @@ void read_b(char *file , HMM* word, int row ,int col)
 	int lineNum = 0;
 	char buf[BUFSIZE];
 	char *pch;
-	
+
 	FILE *fr;
 	fr = fopen(file, "r");
 	if(fr == NULL) {
@@ -334,7 +306,7 @@ void read_b(char *file , HMM* word, int row ,int col)
 			pch =  strtok(buf," ");
 			while(pch != NULL)
 			{
-				sscanf(pch,"%f", &word->b[lineNum][i]);
+				sscanf(pch,"%f", &word->b[lineNum*col+i]);
 				i++;
 				pch = strtok (NULL, " ");
 			}
@@ -354,7 +326,7 @@ void read_a(char *file , HMM* word, int row ,int col)
 	int lineNum = 0;
 	char buf[BUFSIZE];
 	char *pch;
-	
+
 	FILE *fr;
 	fr = fopen(file, "r");
 	if(fr == NULL) {
@@ -367,7 +339,7 @@ void read_a(char *file , HMM* word, int row ,int col)
 			pch =  strtok(buf," ");
 			while(pch != NULL)
 			{
-				sscanf(pch,"%f", &word->a[lineNum][i]);
+				sscanf(pch,"%f", &word->a[lineNum*col+i]);
 				i++;
 				pch = strtok (NULL, " ");
 			}
@@ -418,7 +390,7 @@ void check_a(HMM *word)
 		printf("row(%d)\n",i);
 		for(j=0;j<col;++j)
 		{
-			printf("%10.4e\n",word->a[i][j]);	
+			printf("%10.4e\n",word->a[i*col+j]);	
 
 		}
 		printf("\n\n");
@@ -438,7 +410,7 @@ void check_b(HMM *word)
 		printf("row(%d)\n",i);
 		for(j=0;j<col;++j)
 		{
-			printf("%10.4e\n",word->b[i][j]);	
+			printf("%10.4e\n",word->b[i*col+j]);	
 
 		}
 		printf("\n\n");
@@ -450,13 +422,12 @@ void check_b(HMM *word)
 
 void free_hmm(HMM *word)
 {
-	int T,i;
-	T = word->len;
-	
-	for(i = 0; i < T ; ++i) {
-		free(word->a[i]);
-		free(word->b[i]);
-	}
+	//int T,i;
+	//T = word->len;
+	//for(i = 0; i < T ; ++i) {
+	//	free(word->a[i]);
+	//	free(word->b[i]);
+	//}
 
 	free(word->a);
 	free(word->b);
@@ -486,18 +457,18 @@ void timeval_diff(struct timeval *tdiff, struct timeval *t1, struct timeval *t2)
 }
 
 
-void transpose(float **A, float **A_t, int N)
+void transpose(float *A, float *A_t, int row, int col)
 {
 	int i,j;
-	for(i=0;i<N;++i){
-		for(j=0;j<N;++j){
-			A_t[j][i] = A[i][j];
+	for(i=0;i<row;++i){
+		for(j=0;j<col;++j){
+			A_t[j*row + i] = A[i*col + j];
 		}	
 	}
 
 }
 
-void check_2d_f(float **x, int row, int col)
+void check_2d_f(float *x, int row, int col)
 {
 	int i,j;
 
@@ -506,7 +477,7 @@ void check_2d_f(float **x, int row, int col)
 		printf("row(%d)\n",i);
 		for(j=0;j<col;++j)
 		{
-			printf("%10.4e\n",x[i][j]);	
+			printf("%10.4e\n",x[i*col+j]);	
 
 		}
 		printf("\n\n");

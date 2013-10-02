@@ -36,10 +36,25 @@ endif
 SRCS =  $(wildcard *.c)
 PROG =  $(SRCS:.c=)
 
+# make all
+all: run_opencl_fo.o c_fo ocl_fo 
 
-all: 
+
+#--------------
+# build objects
+#--------------
+run_opencl_fo.o: run_opencl_fo.c run_opencl_fo.h
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c run_opencl_fo.c -o run_opencl_fo.o $(CL_FLAGS) $(OPT)
+
+
+#--------------
+# build programs 
+#--------------
+c_fo: c_fo.c
 	$(CC) $(CCFLAGS) c_fo.c -o c_fo $(OPT)
-	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_fo.c -o ocl_fo $(CL_FLAGS) $(OPT)
+
+ocl_fo:  ocl_fo.c
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_fo.c -o ocl_fo  run_opencl_fo.o $(CL_FLAGS) $(OPT)
 
 .PHONY: clean
 clean:
