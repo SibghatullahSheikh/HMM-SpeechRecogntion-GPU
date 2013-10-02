@@ -36,10 +36,10 @@ endif
 SRCS =  $(wildcard *.c)
 PROG =  $(SRCS:.c=)
 
-#$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) speech.c -o speech $(CL_FLAGS) $(OPT)
 
 all: 
 	$(CC) $(CCFLAGS) c_fo.c -o c_fo $(OPT)
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_fo.c -o ocl_fo $(CL_FLAGS) $(OPT)
 
 .PHONY: clean
 clean:

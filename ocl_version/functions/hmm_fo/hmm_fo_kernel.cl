@@ -24,7 +24,7 @@ __kernel void transpose(
 		const int row,
 		const int col,
 		__global float *a_t
-		}
+		)
 {
 	unsigned int x = get_global_id(0);
 	unsigned int y = get_global_id(1);
