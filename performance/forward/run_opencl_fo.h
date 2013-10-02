@@ -11,7 +11,7 @@ typedef struct{
 	int nstates;
 } HMM;
 
-void run_opencl_fo(HMM *word, int job);
+void run_opencl_fo(HMM *word);
 
 
 

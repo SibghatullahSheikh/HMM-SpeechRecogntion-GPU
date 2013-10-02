@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include <CL/opencl.h>
 
@@ -8,8 +11,10 @@
 #include "run_opencl_fo.h"
 #include "../../utils/ocl_utils.h"
 
-void run_opencl_fo(HMM *word, int job)
+void run_opencl_fo(HMM *word)
 {
+	puts("\n=>GPU");
+
 	int i;
 	int N = word->nstates;
 	int T = word->len;
@@ -36,6 +41,7 @@ void run_opencl_fo(HMM *word, int job)
 
 	cl_int err;
 
+/*
 	// read kernel file
 	char *fileName = "ocl_fo_kernel.cl";
 	char *kernelSource;
@@ -129,7 +135,6 @@ void run_opencl_fo(HMM *word, int job)
 		check_2d_f(A_t,N,N);
 	}
 
-/*
 	// time capsule
 	int frame;
 
@@ -179,26 +184,28 @@ void run_opencl_fo(HMM *word, int job)
 	}
 
 
-*/
 
 
 
-	//clReleaseMemObject(x2_d);
-	//clReleaseMemObject(y_d);
-	clReleaseMemObject(A_d);
-	clReleaseMemObject(At_d);
+	//clReleaseMemObject(A_d);
+	//clReleaseMemObject(At_d);
 	//clReleaseMemObject(prior_d);
 	//clReleaseMemObject(B_d);
 	//clReleaseMemObject(alpha_d);
 
+*/
+
+
+	clFinish(queue);
+
 	clReleaseProgram(program);
-	clReleaseCommandQueue(queue);
 	clReleaseContext(context);
+	clReleaseCommandQueue(queue);
 	for(i=0;i<4;++i){
 		clReleaseKernel(kernel[i]);
 	}
 
-	free(kernelSource);
+	//free(kernelSource);
 	free(A_t);
 
 	return;
