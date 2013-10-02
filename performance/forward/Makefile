@@ -37,13 +37,16 @@ SRCS =  $(wildcard *.c)
 PROG =  $(SRCS:.c=)
 
 # make all
-all: run_opencl_fo.o c_fo ocl_fo 
+all: ocl_utils.o run_opencl_fo.o c_fo ocl_fo 
 
 
 #--------------
 # build objects
 #--------------
-run_opencl_fo.o: run_opencl_fo.c run_opencl_fo.h
+ocl_utils.o: ../../utils/ocl_utils.h ../../utils/ocl_utils.c 
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o $(CL_FLAGS) $(OPT)
+
+run_opencl_fo.o: run_opencl_fo.h run_opencl_fo.c 
 	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c run_opencl_fo.c -o run_opencl_fo.o $(CL_FLAGS) $(OPT)
 
 
@@ -54,8 +57,8 @@ c_fo: c_fo.c
 	$(CC) $(CCFLAGS) c_fo.c -o c_fo $(OPT)
 
 ocl_fo:  ocl_fo.c
-	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_fo.c -o ocl_fo  run_opencl_fo.o $(CL_FLAGS) $(OPT)
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o $(CL_FLAGS) $(OPT)
 
 .PHONY: clean
 clean:
-	rm -rf $(PROG) 
+	rm -rf $(PROG) ../../utils/ocl_utils.o
