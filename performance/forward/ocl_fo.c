@@ -5,12 +5,56 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <stdarg.h>
 
 #include <CL/opencl.h>
 
 #include "../../utils/ocl_utils.h"
 
 #include "run_opencl_fo.h"
+
+void fatal(const char *fmt, ...)
+{
+	va_list va;
+	va_start(va, fmt);
+	fprintf(stderr, "fatal: ");
+	vfprintf(stderr, fmt, va);
+	fprintf(stderr, "\n");
+	fflush(NULL);
+	exit(1);
+}
+
+static void need_argument(int argc, char *argv[], int argi)
+{
+	if (argi == argc -1)
+		fatal("option %s requires one argument.\n", argv[argi]);
+}
+
+
+int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
+{
+	long int diff = (t2->tv_usec + 1000000 * t2->tv_sec) - (t1->tv_usec + 1000000 * t1->tv_sec);
+	result->tv_sec = diff / 1000000;
+	result->tv_usec = diff % 1000000;
+	return (diff<0);
+}
+
+
+void tic(struct timeval *timer)
+{
+	gettimeofday(timer, NULL);
+}
+
+
+void toc(struct timeval *timer)
+{
+	struct timeval tv_end, tv_diff;
+	gettimeofday(&tv_end, NULL);
+	timeval_subtract(&tv_diff, &tv_end, timer);
+	printf("cpuTime = %ld.%06ld(s)\n", tv_diff.tv_sec, tv_diff.tv_usec);
+}
+
+
 
 //-----------------------------------------------------------
 //
@@ -22,31 +66,62 @@ int main(int argc, char*argv[])
 {
 	// 6 config, each has three files to read
 	char *files[] = {
-		//"../resources/config_32N32M_B.txt",
-		//"../resources/config_32N32M_A.txt",
-		//"../resources/config_32N32M_prior.txt",
-	    //			"../resources/config_64N64M_B.txt",
-		//		"../resources/config_64N64M_A.txt",
-		//		"../resources/config_64N64M_prior.txt",
-	//			"../resources/config_128N128M_B.txt",
-	//			"../resources/config_128N128M_A.txt",
-	//			"../resources/config_128N128M_prior.txt",
-		//		"../resources/config_256N256M_B.txt",
-		//		"../resources/config_256N256M_A.txt",
-		//		"../resources/config_256N256M_prior.txt",
-		//		"../resources/config_512N512M_B.txt",
-		//		"../resources/config_512N512M_A.txt",
-		//		"../resources/config_512N512M_prior.txt",
-				"../resources/config_1024N1024M_B.txt",
-				"../resources/config_1024N1024M_A.txt",
-				"../resources/config_1024N1024M_prior.txt",
+		"../resources/config_32N32M_B.txt",
+		"../resources/config_32N32M_A.txt",
+		"../resources/config_32N32M_prior.txt",
+		"../resources/config_64N64M_B.txt",
+		"../resources/config_64N64M_A.txt",
+		"../resources/config_64N64M_prior.txt",
+		"../resources/config_128N128M_B.txt",
+		"../resources/config_128N128M_A.txt",
+		"../resources/config_128N128M_prior.txt",
+		"../resources/config_256N256M_B.txt",
+		"../resources/config_256N256M_A.txt",
+		"../resources/config_256N256M_prior.txt",
+		"../resources/config_512N512M_B.txt",
+		"../resources/config_512N512M_A.txt",
+		"../resources/config_512N512M_prior.txt",
+		"../resources/config_1024N1024M_B.txt",
+		"../resources/config_1024N1024M_A.txt",
+		"../resources/config_1024N1024M_prior.txt",
 	};
 
 	// variables
 	int i,j,k;
-	int job=0;
 	int Len;
 	int debug=0;
+
+	int job=0;
+
+	// select job frome commmand line
+	int argi;
+	if (argc == 1)
+	{
+		puts("Please specify an option.\nUsage: \"./ocl_fo -job number(0-5) \"\n");
+		exit(1);
+	}
+
+	for (argi = 1; argi < argc; ++argi)
+	{
+		if (!strcmp(argv[argi], "-job"))
+		{
+			need_argument(argc, argv,argi);
+			job = atoi(argv[++argi]) ;
+			continue;
+		}
+
+		if (argv[argi][0] == '-')
+		{
+			fatal("'%s' is not a valid command-line option.\n",argv[argi]);
+		}
+	}
+
+	//printf("job = %d\n", job);
+	if( job  > 5) {
+		printf("Job number exceeds the limit 5! Exit Programm!\n");
+		exit(1);	
+	}
+
 
 
 	HMM *word;
@@ -88,6 +163,7 @@ int main(int argc, char*argv[])
 	//---------------------------
 
 	puts("\n=>CPU");
+	struct timeval cpu_timer;
 
 	int N = word->nstates;
 	int T = word->len;
@@ -107,6 +183,9 @@ int main(int argc, char*argv[])
 	transpose(A, A_t, N, T);	
 
 	log_likelihood = 0.0;
+
+	// start timing
+	tic(&cpu_timer);
 
 	for(j=0;j<T;++j)
 	{
@@ -137,6 +216,8 @@ int main(int argc, char*argv[])
 
 		log_likelihood += log(alpha_sum);
 	}
+	// end timing
+	toc(&cpu_timer);
 
 
 	printf("log_likelihood = %lf\n", log_likelihood);
