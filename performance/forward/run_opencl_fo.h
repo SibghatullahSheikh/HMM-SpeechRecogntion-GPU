@@ -37,6 +37,8 @@ void check_pri(HMM *word);
 
 void check_2d_f(float *x, int row, int col);
 
+void check_1d_f(float *x, int len);
+
 void free_hmm(HMM *word);
 
 void start(struct timeval *timer);

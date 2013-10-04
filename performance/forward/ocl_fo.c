@@ -22,24 +22,24 @@ int main(int argc, char*argv[])
 {
 	// 6 config, each has three files to read
 	char *files[] = {
-		"../resources/config_32N32M_B.txt",
-		"../resources/config_32N32M_A.txt",
-		"../resources/config_32N32M_prior.txt",
-		//		"../resources/config_64N64M_B.txt",
+		//"../resources/config_32N32M_B.txt",
+		//"../resources/config_32N32M_A.txt",
+		//"../resources/config_32N32M_prior.txt",
+	    //			"../resources/config_64N64M_B.txt",
 		//		"../resources/config_64N64M_A.txt",
 		//		"../resources/config_64N64M_prior.txt",
-		//		"../resources/config_128N128M_B.txt",
-		//		"../resources/config_128N128M_A.txt",
-		//		"../resources/config_128N128M_prior.txt",
+	//			"../resources/config_128N128M_B.txt",
+	//			"../resources/config_128N128M_A.txt",
+	//			"../resources/config_128N128M_prior.txt",
 		//		"../resources/config_256N256M_B.txt",
 		//		"../resources/config_256N256M_A.txt",
 		//		"../resources/config_256N256M_prior.txt",
 		//		"../resources/config_512N512M_B.txt",
 		//		"../resources/config_512N512M_A.txt",
 		//		"../resources/config_512N512M_prior.txt",
-		//		"../resources/config_1024N1024M_B.txt",
-		//		"../resources/config_1024N1024M_A.txt",
-		//		"../resources/config_1024N1024M_prior.txt",
+				"../resources/config_1024N1024M_B.txt",
+				"../resources/config_1024N1024M_A.txt",
+				"../resources/config_1024N1024M_prior.txt",
 	};
 
 	// variables

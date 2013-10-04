@@ -1,8 +1,11 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 //#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+//#pragma OPENCL EXTENSION cl_khr_global_int32_extended_atomics : enable
 
+//#pragma OPENCL EXTENSION cl_amd_printf : enable
 
-inline void AtomicAdd(volatile __global float *source, const float operand)
+/*
+void AtomicAdd(volatile __global float *source, const float operand)
 {
 	union {
 		unsigned int intVal;
@@ -19,14 +22,13 @@ inline void AtomicAdd(volatile __global float *source, const float operand)
 		newVal.floatVal = prevVal.floatVal + operand;
 	} while (atomic_cmpxchg((volatile __global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
 }
-
+*/
 
 __kernel void transpose( 
 		__global float *a,
 		const int row,
 		const int col,
-		__global float *a_t
-		)
+		__global float *a_t)
 {
 	unsigned int x = get_global_id(0);
 	unsigned int y = get_global_id(1);
@@ -38,18 +40,18 @@ __kernel void transpose(
 
 
 __kernel void init_alpha(
-		__global const float *b_d,
-		__global const float *pi_d,
+		__global float *b_d, // use no contant memory for general purpose
+		__global float *pi_d,
 		__global float *alpha_d,
 		const int nstates,
 		const int T,
-		const int tPos,
-		__global float *alphasum_d,
-		volatile __local float *sm)
+		int tPos,
+		__global float *alphamid_d,
+		__local float *sm)
 {
-	unsigned int gid = get_global_id(0);
-	unsigned int lid = get_local_id(0);
-	unsigned int stride = gid*T;
+	size_t gid = get_global_id(0);
+	size_t lid = get_local_id(0);
+	size_t stride = gid*T;
 
 	if (gid < nstates) {
 		sm[lid] = alpha_d[tPos + stride] = b_d[tPos + stride] * pi_d[gid];
@@ -61,87 +63,139 @@ __kernel void init_alpha(
 
 	// scaling
 	if(lid<32){
-		sm[lid] += sm[lid + 32];
-		sm[lid] += sm[lid + 16];
-		sm[lid] += sm[lid +  8];
-		sm[lid] += sm[lid +  4];
-		sm[lid] += sm[lid +  2];
-		sm[lid] += sm[lid +  1];
+		volatile __local float *sm1 = sm;
+		sm1[lid] += sm1[lid + 32];
+		sm1[lid] += sm1[lid + 16];
+		sm1[lid] += sm1[lid +  8];
+		sm1[lid] += sm1[lid +  4];
+		sm1[lid] += sm1[lid +  2];
+		sm1[lid] += sm1[lid +  1];
 	}
 
 	if(lid == 0) {
-		AtomicAdd(&alphasum_d[tPos], sm[0]);
+		//AtomicAdd(&alphasum_d[tPos], sm[0]);
+		alphamid_d [get_group_id(0) ] = sm[0];
 	}
-
+/*
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
+
 	if (gid < nstates) {
-		alpha_d[stride + tPos]  /= alphasum_d[tPos];
+		alpha_d[stride + tPos]  = alpha_d[stride + tPos] / alphasum_d[tPos];
 	}
+*/
 
 }
 
 
 __kernel void alpha_dev(
-		__global const float *b_d, // read-only
-		__global const float *at_d,
+		__global float *b_d, // same reason 
+		__global float *at_d,
 		__global float *alpha_d,
-		const int nstates,
-		const int T,
-		const int tPos,
-		__global float *alphasum_d,
-		volatile __local float *sm)
+				const int nstates,
+				const int T,
+				int tPos,
+		__global float *alphamid_d,
+		__local  float *sm)
 {
-	unsigned int gid = get_global_id(0);
-	unsigned int lid = get_local_id(0);
-	unsigned int stride = gid*T;
-	int i;
-	double tmp;
+	size_t gid = get_global_id(0);
+	size_t lid = get_local_id(0);
+	size_t stride = gid*T;
 
-	if ( gid < nstates ) {
-		sm[lid] = b_d[stride + tPos];
-	}else {
+	if (gid < nstates) 
+	{
+		int i;
+		double tmp;
+		tmp = 0.0;
+		for(i = 0; i < nstates; ++i){
+			tmp += at_d[ gid*nstates + i] * alpha_d[i*T + tPos-1]; // opt: alpha_d can be in constant ?
+		}
+
+		//sm[lid] = alpha_d[stride + tPos] = tmp * b_d[stride + tPos];
+		alpha_d[stride + tPos] = tmp * b_d[stride + tPos];
+
+	}
+	
+/*	
+	else{
+	
 		sm[lid] = 0.f;
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
-
-	if (gid < nstates) {
-		tmp = 0.0;
-		for(i = 0; i < nstates; ++i){
-			tmp += at_d[gid*nstates+i]*alpha_d[i*T + tPos-1];
-		}
-
-		alpha_d[stride + tPos] =  sm[lid] = tmp * sm[lid];
-		//data = sm[lid] = tmp * sm[lid];
-		//alpha_d[stride + tPos] =  data;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
+*/
+/*
 	// scaling
 	if(lid<32){
-		sm[lid] += sm[lid + 32];
-		sm[lid] += sm[lid + 16];
-		sm[lid] += sm[lid +  8];
-		sm[lid] += sm[lid +  4];
-		sm[lid] += sm[lid +  2];
-		sm[lid] += sm[lid +  1];
+		volatile __local float *sm1 = sm;
+		sm1[lid] += sm1[lid + 32];
+		sm1[lid] += sm1[lid + 16];
+		sm1[lid] += sm1[lid +  8];
+		sm1[lid] += sm1[lid +  4];
+		sm1[lid] += sm1[lid +  2];
+		sm1[lid] += sm1[lid +  1];
 	}
 
 	if(lid == 0) {
-		AtomicAdd(&alphasum_d[tPos], sm[0]);
+		alphamid_d [ get_group_id(0) ] = sm[0];
 	}
-
+*/
+/*
 	barrier(CLK_GLOBAL_MEM_FENCE);
 
 	if (gid < nstates) {
-		alpha_d[stride + tPos]  /= alphasum_d[tPos];
+		alpha_d[stride + tPos]  = alpha_d[stride + tPos] / alphasum_d[tPos];
 	}
-
+*/
 
 }
 
+
+
+__kernel void scale_alpha(
+	__global float *alpha_d,
+	__global float *alphasum_d,
+	__global float *alphamid_d,
+	const int nstates,
+	const int T,
+	int tPos,
+	const int chunks)
+{
+	size_t gid = get_global_id(0);
+	size_t lid = get_local_id(0);
+	size_t stride = gid*T;
+
+
+	// this is non-efficient, but better than transfering data back to host
+	__local float sum[1];
+
+	if(lid == 0 )
+	{
+		// accumulate sum	
+		int i;
+		double tmp = 0.0;
+		for(i=0;i<chunks;++i){
+			tmp += alphamid_d[i];	
+		}
+		sum[0] = (float)tmp;
+	}
+
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+	
+
+	if(gid == 0)
+	{
+		alphasum_d[tPos] = sum[0];
+	}
+
+
+	if (gid < nstates) 
+	{
+		alpha_d[stride + tPos]  = alpha_d[stride + tPos] / sum[0];
+	}
+
+}
 
 /*
 
