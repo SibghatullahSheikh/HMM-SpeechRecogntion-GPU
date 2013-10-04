@@ -49,6 +49,8 @@ void transpose(float *A, float *A_t, int row, int col);
 
 void init_2d_f(float *frames, int row, int col, float val);
 
+void init_1d_f(float *frames, int len, float val);
+
 
 
 
