@@ -21,6 +21,15 @@ void run_opencl_fo(HMM *word)
 	float *A = word->a;
 	float *prior = word->pri;
 
+	// gpu timer
+	cl_ulong gstart, gend;
+	double gpuTime;
+
+	// cpu timer
+	struct timeval cstart;
+	struct timeval cend;
+	double cpuTime;
+
 	float *At; // NxN
 	At = (float*)malloc(sizeof(float)*N*N);
 
@@ -70,9 +79,11 @@ void run_opencl_fo(HMM *word)
 	cl_program program;               // program
 
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*4);
-	/*
-	cl_event *event = (cl_event*)malloc(sizeof(cl_event)*4);    // create events for profiling and concurrent cmdqueue
+	
+	//cl_event *event = (cl_event*)malloc(sizeof(cl_event)*10);    // create events for profiling and concurrent cmdqueue
+	cl_event *event = (cl_event*)malloc(sizeof(cl_event)*2);    
 
+/*
 	cl_event **eventwait = (cl_event**)malloc(sizeof(cl_event*)*2);
 	for(i=0;i<2;++i){
 		eventwait[i] = (cl_event*)malloc(sizeof(cl_event)*2);
@@ -154,16 +165,26 @@ void run_opencl_fo(HMM *word)
 	cl_mem alphasum_d   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T,  NULL, NULL);
 	cl_mem alphamid_d   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*chunks,  NULL, NULL);
 
+	// warm up() device
+	float *dummy = (float*)malloc(sizeof(float));
+	cl_mem dummy_d= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float),  NULL, NULL);
+	for(i=0;i<50;++i){
+		err = clEnqueueWriteBuffer(queue, dummy_d, 		CL_TRUE, 	0, sizeof(float), 	dummy, 		0, NULL, NULL);
+	}
 
 	// Initialize device memory
-	err = clEnqueueWriteBuffer(queue, A_d, 		CL_TRUE, 	0, sizeof(float)*N*N, 	A, 		0, NULL, NULL);
+	err = clEnqueueWriteBuffer(queue, A_d, 		CL_TRUE, 	0, sizeof(float)*N*N, 	A, 		0, NULL, &event[0]);
 	OCL_CHECK(err);
+	//err = clEnqueueWriteBuffer(queue, prior_d, 	CL_TRUE, 	0, sizeof(float)*N, 	prior, 	0, NULL, &event[1]);      
 	err = clEnqueueWriteBuffer(queue, prior_d, 	CL_TRUE, 	0, sizeof(float)*N, 	prior, 	0, NULL, NULL);      
 	OCL_CHECK(err);
+	//err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 		0, NULL, &event[2]); 
 	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 		0, NULL, NULL); 
 	OCL_CHECK(err);
+	//err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*N*T, 	alpha, 	0, NULL, &event[3]); 
 	err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*N*T, 	alpha, 	0, NULL, NULL); 
 	OCL_CHECK(err);
+//	err = clEnqueueWriteBuffer(queue, alphasum_d, CL_TRUE, 	0, sizeof(float)*T, 	alphasum, 0, NULL, &event[4]);  
 	err = clEnqueueWriteBuffer(queue, alphasum_d, CL_TRUE, 	0, sizeof(float)*T, 	alphasum, 0, NULL, NULL);  
 	OCL_CHECK(err);
 
@@ -185,14 +206,6 @@ void run_opencl_fo(HMM *word)
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 	err |= clSetKernelArg(kernel[0], 3, sizeof(cl_mem), &At_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-
-	err = clEnqueueNDRangeKernel(queue, kernel[0], 2, NULL, global_1, local_1, 0, NULL, NULL);
-	OCL_CHECK(err);
-
-
-	// time capsule
-	int frame;
 
 	// 2nd kernel
 	// initial alpha:  B x Prior 
@@ -259,6 +272,14 @@ void run_opencl_fo(HMM *word)
 
 
 
+	// transpose kernel
+	//err = clEnqueueNDRangeKernel(queue, kernel[0], 2, NULL, global_1, local_1, 0, NULL, &event[5] );
+	err = clEnqueueNDRangeKernel(queue, kernel[0], 2, NULL, global_1, local_1, 0, NULL, NULL );
+	OCL_CHECK(err);
+
+
+	// time capsule
+	int frame;
 
 	for(frame = 0 ; frame < T; ++frame)
 	{
@@ -269,6 +290,7 @@ void run_opencl_fo(HMM *word)
 			if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
 
 			err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, NULL);
+//			err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, &event[6]);
 			OCL_CHECK(err);
 
 
@@ -276,6 +298,7 @@ void run_opencl_fo(HMM *word)
 			if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
 
 			err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL);
+			//err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, &event[7]);
 			OCL_CHECK(err);
 
 
@@ -306,6 +329,7 @@ void run_opencl_fo(HMM *word)
 					if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
 
 					err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, NULL);
+					//err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, &event[8]);
 					OCL_CHECK(err);
 
 
@@ -315,6 +339,7 @@ void run_opencl_fo(HMM *word)
 					if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
 
 					err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL);
+					//err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, &event[7]);
 					OCL_CHECK(err);
 
 /*
@@ -362,15 +387,40 @@ void run_opencl_fo(HMM *word)
 
 	clFinish(queue);
 
-	clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , NULL);
+	//clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , &event[9]);
+	clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , &event[1]);
 
-	puts("\nalphasum");
-	//check_1d_f(alphasum, T);
+	//err = clWaitForEvents(1,&event[9]);
+	err = clWaitForEvents(1,&event[1]);
+	OCL_CHECK(err);
 
+	err = clGetEventProfilingInfo (event[0], CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &gstart, NULL);
+	OCL_CHECK(err);
+
+	err = clGetEventProfilingInfo (event[1], CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &gend, NULL);
+	OCL_CHECK(err);
+
+
+
+
+	//puts("\nalphasum");
+	//check_1d_f(alphasum, T)
+
+	tic(&cstart);
 	double log_likelihood = 0.0;
 	for(i=0;i<T;++i){
 		log_likelihood += log(alphasum[i]);	
 	}
+	tic(&cend);
+	cl_ulong diff = (cend.tv_usec - cstart.tv_usec) + 1000000 * (cend.tv_sec - cstart.tv_sec);
+
+	gpuTime = (double)(gend -gstart)/1000000000.0;
+	cpuTime = (double) diff/ 1000000.0; 
+
+	//printf("gpuTime  = %lf(s)\n", gpuTime);
+	//printf("cpuTime  = %lf(s)\n", cpuTime);
+	printf("oclTime = %lf(s)\n", gpuTime + cpuTime);
+
 	printf("log_likelihood = %lf\n", log_likelihood);
 
 
@@ -384,6 +434,8 @@ void run_opencl_fo(HMM *word)
 	clReleaseMemObject(alphasum_d);
 	clReleaseMemObject(alphamid_d);
 
+	clReleaseMemObject(dummy_d);
+
 	clReleaseProgram(program);
 	clReleaseContext(context);
 	clReleaseCommandQueue(queue);
@@ -396,6 +448,8 @@ void run_opencl_fo(HMM *word)
 	free(alpha);
 	free(alphasum);
 	free(alphamid);
+
+	free(dummy);
 
 	return;
 }
@@ -719,6 +773,29 @@ void init_1d_f(float *frames, int len, float val)
 	{
 		frames[i] = val;
 	}
+}
+
+int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
+{
+	long int diff = (t2->tv_usec + 1000000 * t2->tv_sec) - (t1->tv_usec + 1000000 * t1->tv_sec);
+	result->tv_sec = diff / 1000000;
+	result->tv_usec = diff % 1000000;
+	return (diff<0);
+}
+
+
+void tic(struct timeval *timer)
+{
+	gettimeofday(timer, NULL);
+}
+
+
+void toc(struct timeval *timer)
+{
+	struct timeval tv_end, tv_diff;
+	gettimeofday(&tv_end, NULL);
+	timeval_subtract(&tv_diff, &tv_end, timer);
+	printf("cpuTime = %ld.%06ld(s)\n", tv_diff.tv_sec, tv_diff.tv_usec);
 }
 
 

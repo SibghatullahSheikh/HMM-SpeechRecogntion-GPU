@@ -31,29 +31,6 @@ static void need_argument(int argc, char *argv[], int argi)
 }
 
 
-int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
-{
-	long int diff = (t2->tv_usec + 1000000 * t2->tv_sec) - (t1->tv_usec + 1000000 * t1->tv_sec);
-	result->tv_sec = diff / 1000000;
-	result->tv_usec = diff % 1000000;
-	return (diff<0);
-}
-
-
-void tic(struct timeval *timer)
-{
-	gettimeofday(timer, NULL);
-}
-
-
-void toc(struct timeval *timer)
-{
-	struct timeval tv_end, tv_diff;
-	gettimeofday(&tv_end, NULL);
-	timeval_subtract(&tv_diff, &tv_end, timer);
-	printf("cpuTime = %ld.%06ld(s)\n", tv_diff.tv_sec, tv_diff.tv_usec);
-}
-
 
 
 //-----------------------------------------------------------
@@ -163,6 +140,8 @@ int main(int argc, char*argv[])
 	//---------------------------
 
 	puts("\n=>CPU");
+
+
 	struct timeval cpu_timer;
 
 	int N = word->nstates;
@@ -180,12 +159,13 @@ int main(int argc, char*argv[])
 	float *A_t; // NxN
 	A_t = (float*)malloc(sizeof(float)*N*N);
 
+	// start timing
+	tic(&cpu_timer);
+
 	transpose(A, A_t, N, T);	
 
 	log_likelihood = 0.0;
 
-	// start timing
-	tic(&cpu_timer);
 
 	for(j=0;j<T;++j)
 	{
@@ -218,7 +198,6 @@ int main(int argc, char*argv[])
 	}
 	// end timing
 	toc(&cpu_timer);
-
 
 	printf("log_likelihood = %lf\n", log_likelihood);
 

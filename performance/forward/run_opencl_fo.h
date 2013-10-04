@@ -53,7 +53,10 @@ void init_2d_f(float *frames, int row, int col, float val);
 
 void init_1d_f(float *frames, int len, float val);
 
+int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1);
 
+void tic(struct timeval *timer);
 
+void toc(struct timeval *timer);
 
 #endif
