@@ -419,7 +419,7 @@ void run_opencl_fo(HMM *word)
 
 	//printf("gpuTime  = %lf(s)\n", gpuTime);
 	//printf("cpuTime  = %lf(s)\n", cpuTime);
-	printf("oclTime = %lf(s)\n", gpuTime + cpuTime);
+	printf("oclTime = %lf (s)\n", gpuTime + cpuTime);
 
 	printf("log_likelihood = %lf\n", log_likelihood);
 
@@ -795,7 +795,7 @@ void toc(struct timeval *timer)
 	struct timeval tv_end, tv_diff;
 	gettimeofday(&tv_end, NULL);
 	timeval_subtract(&tv_diff, &tv_end, timer);
-	printf("cpuTime = %ld.%06ld(s)\n", tv_diff.tv_sec, tv_diff.tv_usec);
+	printf("cpuTime = %ld.%06ld (s)\n", tv_diff.tv_sec, tv_diff.tv_usec);
 }
 
 
