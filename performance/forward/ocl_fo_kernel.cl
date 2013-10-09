@@ -180,9 +180,7 @@ __kernel void scale_alpha(
 		sum[0] = (float)tmp;
 	}
 
-
 	barrier(CLK_LOCAL_MEM_FENCE);
-	
 
 	if(gid == 0)
 	{
