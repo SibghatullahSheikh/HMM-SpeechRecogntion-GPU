@@ -2046,6 +2046,7 @@ void EM(float **observations, float *prior, float **A, float **mu, float **B, fl
 				alpha_beta_B[j][k]= alpha[j][i]*beta_B[k];			
 			}
 		}
+
 		// A.*alpha_beta_B
 		for(j=0;j<N;++j){
 			for(k=0;k<N;++k){
