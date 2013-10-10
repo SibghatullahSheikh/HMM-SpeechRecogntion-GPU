@@ -61,4 +61,4 @@ ocl_backward:  ocl_backward.c
 
 .PHONY: clean
 clean:
-	rm -rf $(PROG) ../../utils/ocl_utils.o ./result tmp.txt
+	rm -rf $(PROG) ../../utils/ocl_utils.o ./result tmp.txt  *.o
