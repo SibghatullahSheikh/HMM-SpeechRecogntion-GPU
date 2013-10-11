@@ -37,7 +37,7 @@ SRCS =  $(wildcard *.c)
 PROG =  $(SRCS:.c=)
 
 # make all
-all: ocl_utils.o hmm.o run_opencl_em.o ocl_em 
+all: ocl_utils.o hmm.o speech_lib.o run_opencl_em.o ocl_em 
 
 
 #--------------
@@ -47,7 +47,10 @@ ocl_utils.o: ../../utils/ocl_utils.h ../../utils/ocl_utils.c
 	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o $(CL_FLAGS) $(OPT)
 
 hmm.o: hmm.h hmm.c 
-	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c hmm.c -o hmm.o $(CL_FLAGS) $(OPT)
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c hmm.c -o hmm.o $(OPT)
+
+speech_lib.o: speech_lib.h speech_lib.c 
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c speech_lib.c -o speech_lib.o $(OPT)
 
 run_opencl_em.o: run_opencl_em.h run_opencl_em.c 
 	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) -c run_opencl_em.c -o run_opencl_em.o $(CL_FLAGS) $(OPT)
@@ -57,8 +60,8 @@ run_opencl_em.o: run_opencl_em.h run_opencl_em.c
 # build programs 
 #--------------
 ocl_em:  ocl_em.c
-	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_em.c -o ocl_em  ../../utils/ocl_utils.o hmm.o run_opencl_em.o $(CL_FLAGS) $(OPT)
+	$(CC) $(CCFLAGS) $(CL_INCLUDE) $(CL_LIBPATH) ocl_em.c -o ocl_em  ../../utils/ocl_utils.o hmm.o speech_lib.o run_opencl_em.o $(CL_FLAGS) $(OPT)
 
 .PHONY: clean
 clean:
-	rm -rf $(PROG) ../../utils/ocl_utils.o ./result tmp.txt
+	rm -rf $(PROG) ../../utils/ocl_utils.o ./result tmp.txt *.o

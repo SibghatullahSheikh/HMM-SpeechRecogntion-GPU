@@ -333,6 +333,21 @@ void check_1d_f(float *x, int len)
 	}
 }
 
+void init_3d_f(float *frames, int row, int col, int height, float val)
+{
+	int i,j,k;
+	for(i=0;i<row;++i)
+	{
+		for (j=0;j<col;++j)
+		{
+			for(k=0;k<height;++k)
+			{
+				frames[(i*col+j)*height + k] = val;
+			}
+		}
+	}
+}
+
 void init_2d_f(float *frames, int row, int col, float val)
 {
 	int i,j;

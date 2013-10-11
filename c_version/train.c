@@ -2136,6 +2136,7 @@ void EM(float **observations, float *prior, float **A, float **mu, float **B, fl
 		}	
 	}
 
+
 	//------------------------------------
 	//	gamma_state_sum = sum(gamma, 2);
 	//------------------------------------

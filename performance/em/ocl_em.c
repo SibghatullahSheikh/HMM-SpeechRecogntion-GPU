@@ -12,6 +12,7 @@
 #include "../../utils/ocl_utils.h"
 
 #include "hmm.h"
+#include "speech_lib.h"
 #include "run_opencl_em.h"
 
 void fatal(const char *fmt, ...)
@@ -70,7 +71,6 @@ int main(int argc, char*argv[])
 	// vables
 	int i,j,k;
 	int Len;
-	int debug=0;
 
 	int job=0;
 
@@ -139,16 +139,6 @@ int main(int argc, char*argv[])
 	//read_config(files,job,B,A,prior,Len);
 	read_config(word,files,job,Len,Len);
 
-	printf("Done!\n");
-	if( debug && job == 0 ) {
-		puts("a");
-		check_a(word);	
-		puts("b");
-		check_b(word);	
-		//puts("pri");
-		//check_pri(word);	
-	}
-
 
 	//----------------------
 	// run backward algorithm
@@ -190,46 +180,67 @@ int main(int argc, char*argv[])
 	init_2d_f(xi_sum,N,N,0.f);
 
 	// NxT
-	float *gamma= (float*)malloc(sizeof(float)*N*N);
+	float *gamma= (float*)malloc(sizeof(float)*N*T);
 	init_2d_f(gamma,N,T,0.f);
 
 
 	// intermediate data array
-	float *beta_B = (float*)malloc(sizeof(float)*N);
+	float *beta_B 		  = (float*)malloc(sizeof(float)*N);
+	float *alpha_beta     = (float*)malloc(sizeof(float)*N); // Nx1
 	float *alpha_beta_B   = (float*)malloc(sizeof(float)*N*N); // NxN
 	float *A_alpha_beta_B = (float*)malloc(sizeof(float)*N*N); // NxN
 
 	int window;
+	double tmp;
 
 	// start timing
 	tic(&cpu_timer);
 
-
-	for(window=0; window<T-1; ++window)
+	//------------------------------------//
+	//	E-step
+	//------------------------------------//
+	for(window=0; window < (T-1) ; ++window)
 	{
 		// beta * B ( window +1 )
 		for(j=0;j<N;++j)
 		{
 			beta_B[j] = beta[j*T + window + 1] * B[j*T + window + 1];
 		} 
+
+		if (window == 0 && 0){
+			check_1d_f(beta_B,N);
+		}
+
 	
 		// alpha * beta * B
 		for(j=0;j<N;++j){
 			for(k=0;k<N;++k){
-				alpha_beta_B[j*N + k]= alpha[j*T + window]*beta_B[k];			
+				alpha_beta_B[j*N + k]= alpha[j*T + window] * beta_B[k];			
 			}
 		}
+
+		if (window == 0 && 0){
+			check_2d_f(alpha_beta_B,N,N);
+		}
+
 
 		// A * alpha * beta * B
 		for(j=0;j<N;++j){
 			for(k=0;k<N;++k){
-				A_alpha_beta_B[j*N + k] = A[j*N + k]*alpha_beta_B[j*N + k];
+				A_alpha_beta_B[j*N + k] = A[j*N + k] * alpha_beta_B[j*N + k];
 			}
+		}
+
+		if (window == 0 && 0){
+			check_2d_f(A_alpha_beta_B,N,N);
 		}
 
 		// normalise
 		normalise_2d_f(A_alpha_beta_B,N,N);
 
+		if (window == 0 && 0){
+			check_2d_f(A_alpha_beta_B,N,N);
+		}
 
 		// xi_sum + A_alpha_beta_B
 		for(j=0;j<N;++j){
@@ -238,18 +249,23 @@ int main(int argc, char*argv[])
 			}
 		}
 
-		// beta * B ( window )
+		if (window == 0 && 0){
+			check_2d_f(xi_sum,N,N);
+		}
+
+		// alpha * beta ( window )
 		for(j=0;j<N;++j)
 		{
-			beta_B[j] = beta[j*T + window ] * B[j*T + window ];
+			alpha_beta[j] = alpha[j*T + window ] * beta [j*T + window ];
 		} 
 
+
 		// normalise
-		normalise_1d_f(beta_B,N);
+		normalise_1d_f(alpha_beta,N);
 
 		// update gamma
 		for(j=0;j<N;++j){
-			gamma[j*T + window]= beta_B[j];
+			gamma[j*T + window]= alpha_beta[j];
 		} 
 
 
@@ -258,15 +274,154 @@ int main(int argc, char*argv[])
 	// update gamma for the last window (T -1)
 	for(j=0;j<N;++j)
 	{
-		beta_B[j] = beta[j*T + T-1] * B[j*T + T-1];
+		alpha_beta[j] = alpha[j*T + T-1] * beta [j*T + T-1];
 	} 
-	normalise_1d_f(beta_B,N);
+	normalise_1d_f(alpha_beta,N);
 	for(j=0;j<N;++j){
-		gamma[j*T + T -1]= beta_B[j];
+		gamma[j*T + T -1]= alpha_beta[j];
 	} 
+
+	//check_2d_f(gamma,N,T);
+
+
+
+
+	//------------------------------------//
+	//	M-step
+	//------------------------------------//
+
+	// expected prior
+	float *exp_prior=(float*)malloc(sizeof(float)*N); // Nx1
+	for(i=0;i<N;++i){
+		exp_prior[i] = gamma[i*T + 0];
+	}
+
+	// expected A 
+	float *exp_A=(float*)malloc(sizeof(float)*N*N);
+	mk_stochastic_2d_f(xi_sum,N,N,exp_A);
+
+	// expected sigma : DxDxN
+	float *exp_sigma;
+	exp_sigma = (float*)malloc(sizeof(float*)*D*D*N); // row
+	init_3d_f(exp_sigma,D,D,N,0.f);
+
+	// exp_mu : DxN
+	float *exp_mu=(float*)malloc(sizeof(float)*D*N);
+	init_2d_f(exp_mu,D,N,0.f);
+
+	float *gamma_state_sum	= (float*)malloc(sizeof(float)*N); // Nx1
+
+	for(i=0;i<N;++i){
+		tmp = 0.0;
+		for(j=0;j<T;++j)
+		{
+			tmp += gamma[i][j];
+		}
+		//Set any zeroes to one before dividing to avoid NaN
+		if(tmp == 0.0){
+			tmp = 1.0;
+		}
+		gamma_state_sum[i]=(float)tmp;
+	}	
+
+	// intermediate arrays
+	float *gamma_obs = (float*)malloc(sizeof(float)*D*T); // DxT
+
+	//-----------------------------------------------------
+	// need to configure observations/observations_t
+	// need to define D (feature dimension)
+	//-----------------------------------------------------
+
+	// go through each state
+	for(k=0;k<N;++k)
+	{
+
+		for(i=0;i<D;++i){ // num of repeats
+			for(j=0;j<T;++j){
+				gamma_obs[i*T + j]=gamma[k*T + j];	
+			}	
+		}
+
+		for(i=0;i<D;++i){
+			for(j=0;j<T;++j){
+				gamma_obs[i*T + j] *= observations[i*T + j];	
+			}
+		}
+
+
+		for(i=0;i<D;++i){
+			tmp=0.0;
+			for(j=0;j<T;++j){
+				tmp += gamma_obs[i*T + j];	
+			}
+			exp_mu[i*N + k] = (float)tmp/gamma_state_sum[k]; 
+		}
+
+		// gamma_obs(DxT)  *  observations_t (TxD)
+		for(i=0;i<D;++i){ // row
+			for(j=0;j<D;++j){ // col
+				tmp = 0.0;	
+				for(n=0;n<T;++n){
+					tmp += gamma_obs[i*T + n]*observations_t[n*D + j];
+				}
+				gammaob_ob_t[i*D + j] = (float)tmp;
+			}
+		}
+
+		for(i=0;i<D;++i){ // row
+			for(j=0;j<D;++j){ // col
+				gammaob_ob_t[i][j] /= gamma_state_sum[k];
+			}
+		}
+
+
+		// matrix multiplication
+		for(i=0;i<D;++i){// row
+			for(j=0;j<D;++j){ // col
+				exp_mu_mul[i*D + j] = exp_mu[i*N + k] * exp_mu[j*N + k];
+			}
+		}
+
+		// gammaob_bo_t  - exp_mu_mul
+		for(i=0;i<D;++i){// row
+			for(j=0;j<D;++j){ // col
+				gammaob_ob_t[i*D + j] -= exp_mu_mul[i*D + j];
+			}
+		}
+
+		// symmetrize()	
+		symmetrize_f(gammaob_ob_t,D);
+
+
+		// save to exp_sigma
+		for(i=0;i<D;++i){// row
+			for(j=0;j<D;++j){ // col
+				exp_sigma[(i*D+j)*D + k] = gammaob_ob_t[i*D+j];
+			}
+		}
+
+	}
+
+	// % Ninja trick to ensure positive semidefiniteness
+	for(k=0;k<N;++k)
+	{
+		for(i=0;i<D;++i)
+		{
+			for(j=0;j<D;++j)
+			{
+				if(i==j)	exp_sigma[(i*D+j)*D + k] += 0.01;
+			}
+		}
+	}
+
+
+	// need to update HMM parameters
+
 
 	// end timing
 	toc(&cpu_timer);
+
+
 
 
 	// check out the beta
@@ -282,7 +437,16 @@ int main(int argc, char*argv[])
 	free(gamma);
 	free(beta_B);
 	free(alpha_beta_B);
+	free(alpha_beta);
 	free(A_alpha_beta_B);
+
+	free(exp_prior);
+	free(exp_A);
+	free(exp_mu);
+	free(exp_sigma);
+	free(gamma_state_sum);
+
+	free(gamma_obs);
 
 	return 0;
 }
