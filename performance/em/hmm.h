@@ -9,12 +9,14 @@ typedef struct{
 	// float *pri; //Nx1
 	float *alpha; //NxT
 	float *beta; //NxT
+	float *obs; // DxT
 	int len;
 	int nstates;
+	int features;
 } HMM;
 
 // some useful functions
-void read_config(HMM* word, char **files,int job, int states, int len);
+void read_config(HMM* word, char **files,int job, int states, int len, int features);
 
 int getLineNum(char *file);
 
@@ -27,6 +29,8 @@ void read_b(char *file , HMM* word, int row ,int col);
 void read_alpha(char *file , HMM* word, int row ,int col);
 
 void read_beta(char *file , HMM* word, int row ,int col);
+
+void read_obs(char *file , HMM* word, int row ,int col);
 
 //void read_pri(char *file ,HMM* word, int len);
 

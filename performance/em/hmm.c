@@ -14,23 +14,26 @@
 //
 //-----------------------------------------------------------
 
-void read_config(HMM* word, char **files,int job, int states, int len)
+void read_config(HMM* word, char **files,int job, int states, int len, int features)
 {
 	// variables
 	int i;
 	int N = states;
 	int T = len;
+	int D = features;
 
 	word->nstates = N;
 	word->len = T;
+	word->features =  D;
 
 	// allocate parameters
 	word->b   	= (float*)malloc(sizeof(float)*N*T);
 	word->a   	= (float*)malloc(sizeof(float)*N*N);
 	word->alpha = (float*)malloc(sizeof(float)*N*T);
 	word->beta  = (float*)malloc(sizeof(float)*N*T);
+	word->obs   = (float*)malloc(sizeof(float)*D*T);
 
-	for(i = 0; i < 4; ++i){
+	for(i = 0; i < 5; ++i){
 		if(i == 0){
 			read_b(files[job*4],word,N,T);
 		}
@@ -45,6 +48,10 @@ void read_config(HMM* word, char **files,int job, int states, int len)
 
 		if(i == 3){
 			read_beta(files[job*4+3],word,N,T);
+		}
+		
+		if(i == 4){
+			read_obs(files[job*4+4],word,D,T);
 		}
 	}
 
@@ -186,6 +193,40 @@ void read_alpha(char *file , HMM* word, int row ,int col)
 		fclose(fr);
 	}
 }
+
+
+
+void read_obs(char *file , HMM* word, int row ,int col)
+{
+	int i;
+	int lineNum = 0;
+	char buf[BUFSIZE];
+	char *pch;
+
+	FILE *fr;
+	fr = fopen(file, "r");
+	if(fr == NULL) {
+		printf("Can't open %s!\n", file);
+		exit(1);
+	}else{
+		while(fgets(buf, BUFSIZE, fr) != NULL)
+		{
+			i = 0;
+			pch =  strtok(buf," ");
+			while(pch != NULL)
+			{
+				sscanf(pch,"%f", &word->obs[lineNum*col+i]);
+				i++;
+				pch = strtok (NULL, " ");
+			}
+			lineNum++;
+		}
+		fclose(fr);
+	}
+}
+
+
+
 
 void read_beta(char *file , HMM* word, int row ,int col)
 {

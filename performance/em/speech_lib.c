@@ -128,4 +128,18 @@ void mk_stochastic_2d_f(float *x, int row, int col, float *out)
 }
 
 
+void symmetrize_f(float *in, int N)
+{
+	int i,j;
+	for(i=0;i<N;++i){
+		for(j=0;j<i;++j){
+			// compare (i,j) with (j,i)
+			if(in[i*N + j]<in[j*N + i]){
+				in[i*N + j] = in[j*N + i];
+			}else{
+				in[j*N + i] = in[i*N + j];
+			}
+		}
+	}
+}
 

@@ -8,4 +8,6 @@ void normalise_2d_f(float *x, int row, int col);
 
 void mk_stochastic_2d_f(float *x, int row, int col, float *out);
 
+void symmetrize_f(float *in, int N);
+
 #endif

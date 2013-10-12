@@ -46,30 +46,44 @@ int main(int argc, char*argv[])
 		"resources/config_32N32M_A.txt",
 		"resources/config_32N32M_alpha.txt",
 		"resources/config_32N32M_beta.txt",
+		"resources/config_32N32M_obs.txt",
+
 		"resources/config_64N64M_B.txt",
 		"resources/config_64N64M_A.txt",
 		"resources/config_64N64M_alpha.txt",
 		"resources/config_64N64M_beta.txt",
+		"resources/config_64N64M_obs.txt",
+
 		"resources/config_128N128M_B.txt",
 		"resources/config_128N128M_A.txt",
 		"resources/config_128N128M_alpha.txt",
 		"resources/config_128N128M_beta.txt",
+		"resources/config_128N128M_obs.txt",
+
 		"resources/config_256N256M_B.txt",
 		"resources/config_256N256M_A.txt",
 		"resources/config_256N256M_alpha.txt",
 		"resources/config_256N256M_beta.txt",
+		"resources/config_256N256M_obs.txt",
+
 		"resources/config_512N512M_B.txt",
 		"resources/config_512N512M_A.txt",
 		"resources/config_512N512M_alpha.txt",
 		"resources/config_512N512M_beta.txt",
+		"resources/config_512N512M_obs.txt",
+
+
 		"resources/config_1024N1024M_B.txt",
 		"resources/config_1024N1024M_A.txt",
 		"resources/config_1024N1024M_alpha.txt",
 		"resources/config_1024N1024M_beta.txt",
+		"resources/config_1024N1024M_obs.txt",
+
 	};
 
+
 	// vables
-	int i,j,k;
+	int i,j,n,k;
 	int Len;
 
 	int job=0;
@@ -137,7 +151,8 @@ int main(int argc, char*argv[])
 	printf("Read the following files...");
 
 	//read_config(files,job,B,A,prior,Len);
-	read_config(word,files,job,Len,Len);
+	read_config(word,files,job,Len,Len,Len);
+
 
 
 	//----------------------
@@ -165,15 +180,26 @@ int main(int argc, char*argv[])
 
 	int N = word->nstates;
 	int T = word->len;
+	int D = word->features;
+
 	float *B = word->b;
 	float *A = word->a;
 	float *alpha = word->alpha;
 	float *beta  = word->beta;
+	float *observations = word->obs; // D x T
 
-	//check_2d_f(B,N,T);
-	//check_2d_f(A,N,N);
-	//check_2d_f(Alpha,N,T);
-	//check_2d_f(Beta,N,T);
+	float *observations_t = (float*)malloc(sizeof(float)*T*D);
+
+	transpose(observations,observations_t,D,T);
+
+
+
+	// check_2d_f(B,N,T);
+	// check_2d_f(A,N,N);
+	// check_2d_f(Alpha,N,T);
+	// check_2d_f(Beta,N,T);
+	// check_2d_f(observations,D,T);
+
 
 	// NxN
 	float *xi_sum	= (float*)malloc(sizeof(float)*N*N);
@@ -315,7 +341,7 @@ int main(int argc, char*argv[])
 		tmp = 0.0;
 		for(j=0;j<T;++j)
 		{
-			tmp += gamma[i][j];
+			tmp += gamma[i*T + j];
 		}
 		//Set any zeroes to one before dividing to avoid NaN
 		if(tmp == 0.0){
@@ -324,8 +350,15 @@ int main(int argc, char*argv[])
 		gamma_state_sum[i]=(float)tmp;
 	}	
 
+
 	// intermediate arrays
-	float *gamma_obs = (float*)malloc(sizeof(float)*D*T); // DxT
+	float *gamma_obs 		= (float*)malloc(sizeof(float)*D*T); // DxT
+	float *gamma_obs_mul	= (float*)malloc(sizeof(float)*D*D); // DxD
+	float *exp_mu_mul		= (float*)malloc(sizeof(float)*D*D); // DxD
+	float *gammaob_ob_t	    = (float*)malloc(sizeof(float)*D*D); // DxD
+
+
+
 
 	//-----------------------------------------------------
 	// need to configure observations/observations_t
@@ -368,9 +401,10 @@ int main(int argc, char*argv[])
 			}
 		}
 
+		// opt : merge with previous step
 		for(i=0;i<D;++i){ // row
 			for(j=0;j<D;++j){ // col
-				gammaob_ob_t[i][j] /= gamma_state_sum[k];
+				gammaob_ob_t[i*D + j] /= gamma_state_sum[k];
 			}
 		}
 
@@ -391,7 +425,6 @@ int main(int argc, char*argv[])
 
 		// symmetrize()	
 		symmetrize_f(gammaob_ob_t,D);
-
 
 		// save to exp_sigma
 		for(i=0;i<D;++i){// row
@@ -427,7 +460,24 @@ int main(int argc, char*argv[])
 	// check out the beta
 	//check_2d_f(beta,N,T);	
 
+	//check_1d_f(exp_prior,N);	
+	//check_2d_f(exp_A,N,N);	
+	//check_2d_f(exp_mu,D,N);	
 
+	// check exp_sigma
+
+	puts("sigma ");
+
+	for(i=0;i<D;++i)
+	{
+		printf("row %d\n", i);
+		for(j=0;j<D;++j)
+		{
+			printf("%.4e\n", exp_sigma[(i*D+j)*D + 1]);
+
+		}
+	}
+	printf("\n");
 
 
 	// free memory
@@ -447,6 +497,13 @@ int main(int argc, char*argv[])
 	free(gamma_state_sum);
 
 	free(gamma_obs);
+	free(observations_t);
+
+	free(gamma_obs_mul);
+	free(exp_mu_mul);
+	free(gammaob_ob_t);
+
+
 
 	return 0;
 }
