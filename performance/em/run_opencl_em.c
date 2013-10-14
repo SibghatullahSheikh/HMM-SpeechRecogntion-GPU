@@ -172,7 +172,6 @@ void run_opencl_em(HMM *word)
 	}
 
 
-
 	// Initialize device memory
 	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 		0, NULL, &event[0]); 
 	OCL_CHECK(err);
@@ -245,8 +244,11 @@ void run_opencl_em(HMM *word)
 	//------------------------------------------------
 	int window;
 	double tmp;
+
+/*
 	for(window = 0; window < (T-1) ; ++window)
 	{
+		printf("window = %d\n", window);
 		// kernel 1
 		err = clSetKernelArg(kernel[0], 7, sizeof(int), &window);
 		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
@@ -333,8 +335,9 @@ void run_opencl_em(HMM *word)
 		gamma_state_sum[i]=(float)tmp;
 	}	
 
+*/
 	
-
+/*
 
 	//---------------------------------------
 	// maximization
@@ -543,17 +546,6 @@ void run_opencl_em(HMM *word)
 	gpuTime = (double)(gend -gstart)/1000000000.0;
 
 	printf("oclTime = %lf (s)\n", gpuTime );
-/*
-	clFinish(queue);
-
-	clEnqueueReadBuffer(queue, beta_d, CL_TRUE, 0, sizeof(float)*N*T, beta, 0, NULL , &event[1]);
-
-
-	cpuTime = 0.0; 
-
-
-	// check
-	//check_2d_f(beta,N,T);
 */
 
 
@@ -574,7 +566,7 @@ void run_opencl_em(HMM *word)
 	clReleaseMemObject(gammaob_ob_t_d);
 	//clReleaseMemObject(exp_mu_mul_d);
 	
-	clReleaseMemObject(dummy_d);
+	//clReleaseMemObject(dummy_d);
 
 
 
@@ -607,7 +599,7 @@ void run_opencl_em(HMM *word)
 	free(exp_mu);
 	free(exp_sigma);
 	free(gamma_state_sum);
-	free(dummy);
+	//free(dummy);
 
 	return;
 }

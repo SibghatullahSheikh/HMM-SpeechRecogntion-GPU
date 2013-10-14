@@ -163,14 +163,14 @@ int main(int argc, char*argv[])
 	// GPU Version
 	//---------------------------
 
-	// run_opencl_em(word);
+	 run_opencl_em(word);
 
 
 
 	//------------------------------------------------
 	// CPU Version
 	//------------------------------------------------
-
+/*
 	puts("\n=>CPU");
 
 	struct timeval cpu_timer;
@@ -500,7 +500,7 @@ int main(int argc, char*argv[])
 	free(exp_mu_mul);
 	free(gammaob_ob_t);
 
-
+*/
 	return 0;
 }
 
