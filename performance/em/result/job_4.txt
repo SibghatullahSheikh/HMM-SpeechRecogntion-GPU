@@ -1,0 +1,40 @@
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 311.473194 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 306.079877 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 304.914773 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 310.770198 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 311.733426 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 306.100156 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 305.190569 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 310.739928 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 311.127060 (s)
+config_512N_512M
+Read the following files...
+=>CPU
+cpuTime = 306.094656 (s)

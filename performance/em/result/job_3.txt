@@ -1,0 +1,40 @@
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 14.073157 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 14.738101 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 15.918356 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 13.771163 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 16.038969 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 14.391982 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 15.673287 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 16.460800 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 15.478404 (s)
+config_256N_256M
+Read the following files...
+=>CPU
+cpuTime = 16.194234 (s)

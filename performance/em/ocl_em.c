@@ -163,7 +163,7 @@ int main(int argc, char*argv[])
 	// GPU Version
 	//---------------------------
 
-	 run_opencl_em(word);
+	// run_opencl_em(word);
 
 
 

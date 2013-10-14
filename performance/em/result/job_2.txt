@@ -1,0 +1,40 @@
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.811875 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.811400 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.812224 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.810796 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.811508 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.809584 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.813770 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.811001 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.810538 (s)
+config_128N_128M
+Read the following files...
+=>CPU
+cpuTime = 0.810627 (s)
