@@ -21,7 +21,7 @@ void normalise_1d_f(float *x, int len)
 
 	if(sum == 0.0)
 	{
-		printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
+		//printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
 		sum = 1.0;
 	}
 
@@ -57,7 +57,7 @@ void normalise_2d_f(float *x, int row, int col)
 
 	if(sum == 0.0)
 	{
-		printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
+		//printf("Warning: sum along dimension is zero! Change it to 1. (FILE:%s,LINE:%d)\n",__FILE__,__LINE__);
 		sum = 1.0;
 	}
 

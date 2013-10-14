@@ -163,10 +163,7 @@ int main(int argc, char*argv[])
 	// GPU Version
 	//---------------------------
 
-	//	run_opencl_backward(word);
-
-
-
+	 run_opencl_em(word);
 
 
 
@@ -416,6 +413,7 @@ int main(int argc, char*argv[])
 			}
 		}
 
+		// opt : merge with previous one
 		// gammaob_bo_t  - exp_mu_mul
 		for(i=0;i<D;++i){// row
 			for(j=0;j<D;++j){ // col
@@ -466,18 +464,17 @@ int main(int argc, char*argv[])
 
 	// check exp_sigma
 
-	puts("sigma ");
-
-	for(i=0;i<D;++i)
-	{
-		printf("row %d\n", i);
-		for(j=0;j<D;++j)
-		{
-			printf("%.4e\n", exp_sigma[(i*D+j)*D + 1]);
-
-		}
-	}
-	printf("\n");
+//	puts("sigma ");
+//	for(i=0;i<D;++i)
+//	{
+//		printf("row %d\n", i);
+//		for(j=0;j<D;++j)
+//		{
+//			printf("%.4e\n", exp_sigma[(i*D+j)*D + 1]);
+//
+//		}
+//	}
+//	printf("\n");
 
 
 	// free memory
@@ -502,7 +499,6 @@ int main(int argc, char*argv[])
 	free(gamma_obs_mul);
 	free(exp_mu_mul);
 	free(gammaob_ob_t);
-
 
 
 	return 0;

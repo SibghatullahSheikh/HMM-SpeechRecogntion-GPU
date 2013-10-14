@@ -1,112 +1,152 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 //#pragma OPENCL EXTENSION cl_amd_printf : enable
 
-__kernel void genbetaB( 
-		__global float *beta, // N x T
-		__global float *B,  // N x T
-		__global float *betaB, //N x 1
-		const int nstates,
+
+//---------------------------
+// Expectation kernels
+//--------------------------
+
+//----------
+// opt : memory accessing
+//----------
+
+// kernel 1 : multiply beta and B
+//			  alpha * beta
+__kernel void beta_mul_B(
+	__global float *beta,
+	__global float *B,
+	__global float *alpha,
+	__global float *beta_B, 	// 1st output
+	__global float *alpha_beta, // 2nd output
+	const int N,
+	const int T,
+	const int window)
+{
+	size_t gid = get_global_id(0);
+
+	if(gid < N){
+		beta_B[gid] 	= beta[gid * T + window + 1] * B[gid * T + window + 1];
+		alpha_beta[gid] = alpha[gid * T + window] * beta[gid * T + window];
+	}
+}
+
+
+// kernel 2 : A * ( alpha * beta_B )
+__kernel void A_alpha_beta_B_dev(
+		__global float *beta_B,
+		__global float *alpha,
+		__global float *A,
+		__global float *A_alpha_beta_B,
+		const int N,
 		const int T,
-		const int tPos)
+		const int window)
 {
-	size_t gid = get_global_id(0);
+	size_t gx = get_global_id(0);
+	size_t gy = get_global_id(1);
 
-	if (gid < nstates ) 
+	if( gx < N && gy < N )
 	{
-		betaB[gid] = beta[gid*T + tPos+1] * B[gid*T + tPos+1];
+		A_alpha_beta_B[gx * N + gy] = alpha[gx * T + window] * beta_B[gy] * A[gx * N + gy];			
 	}
 }
 
 
 
-__kernel void beta_dev(
-	__global float *A_d,
-	__global float *betaB_d,
-	__global float *beta_d,
-	__global float *betasum_int_d,
-	const int nstates,
-	const int T,
-	const int tPos,
-	__local float *sm)
+// kernel 3 : 
+__kernel void gamma_obs_dev (
+		__global float *gamma,
+		__global float *observations,
+		__global float *gamma_obs,
+		const int D,
+		const int T,
+		const int k)
 {
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-	size_t stride = gid*T;
+	size_t gx = get_global_id(0); // D
+	size_t gy = get_global_id(1); // T
 
-	int i;
-	double tmp;
-
-	if(gid < nstates )
+	if( gx < D && gy < T )
 	{
-		// accumulate sum	
-		tmp = 0.0;
-		for(i=0;i< nstates;++i){
-			tmp +=  A_d[gid*nstates + i] * betaB_d[i];	
+		gamma_obs[gx * T + gy] = gamma[k * T + gy] * observations[gx * T + gy];	
+	}
+}
+
+
+
+// kernel 4 :
+__kernel void exp_mu_dev (
+		__global float *gamma_obs,
+		__constant float *gamma_state_sum,
+		__global float *exp_mu,
+		const int D,
+		const int T,
+		const int N,
+		const int k)
+{
+	size_t gid = get_global_id(0); // D
+
+	if( gid < D )
+	{
+		int j;
+		double tmp = 0.0;
+		for( j = 0; j < T ; ++j ) {
+			tmp += gamma_obs[ gid * T + j];	
 		}
 
-		sm[lid] = beta_d[stride + tPos] = (float) tmp;
-	}else{
-		sm[lid] = 0.f;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// reduction on shared memory
-	if( lid < 32 )
-	{
-		volatile __local float *sm1 = sm;
-		sm1[lid] += sm1[lid + 32];
-		sm1[lid] += sm1[lid + 16];
-		sm1[lid] += sm1[lid +  8];
-		sm1[lid] += sm1[lid +  4];
-		sm1[lid] += sm1[lid +  2];
-		sm1[lid] += sm1[lid +  1];
-	
-	}
-
-	if(lid == 0) 
-	{
-		betasum_int_d [get_group_id(0)] = sm[0];
+		exp_mu[gid * N + k] = (float)tmp/gamma_state_sum[k];
 	}
 }
 
+// kernel 5: matrix multiplication
+// 				gamma_obs * observations_t = gammaob_ob_t   ( a * b = c )
 
-
-
-__kernel void scale_beta(
-	__global float *beta_d,
-	__global float *betasum_int_d,
-	const int nstates,
+__kernel void gammaob_ob_t_dev (
+	__global float *gamma_obs,
+	__global float *observations_t,
+	__global float *gammaob_ob_t,
+	__constant float *gamma_state_sum,
+	const int D,
 	const int T,
-	const int tPos,
-	const int chunks)
+	const int k)
 {
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-	size_t stride = gid*T;
+	size_t gx = get_global_id(0); // i
+	size_t gy = get_global_id(1); // j
+	int n;
 
-	int i;
-	double tmp;
-
-	__local float sm[1];
-
-	// the first thread sum up	
-	if(lid == 0)
+	if( gx < D && gy < D )
 	{
-		// accumulate sum   
-		tmp = 0.0;
-		for(i=0;i<chunks;++i){
-			tmp += betasum_int_d[i];   
+		double tmp = 0.0;
+		for(n = 0; n < T; ++n) {
+			tmp += gamma_obs[gx * T + n] * observations_t[ n * D + gy];
 		}
-		sm[0] = (float)tmp;
-	}
 
-	barrier(CLK_LOCAL_MEM_FENCE);
+		gammaob_ob_t[gx * D + gy] = (float)tmp / gamma_state_sum[k];
 
-	if (gid < nstates) 
-	{
-		beta_d[stride + tPos]  /= sm[0];
 	}
 
 }
+
+
+
+// kernel 6 : exp_mu * exp_mu'
+__kernel void exp_mu_mul_dev (
+	__global float *exp_mu,
+	//__global float *exp_mu_mul,
+	__global float *gammaob_ob_t,
+	const int D,
+	const int N,
+	const int k)
+{
+	size_t gx = get_global_id(0); // i
+	size_t gy = get_global_id(1); // j
+
+	if( gx < D && gy < D )
+	{
+		//exp_mu_mul[gx * D + gy] = exp_mu[gx * N + k] * exp_mu[gy * N + k];
+		gammaob_ob_t[gx * D + gy] -= (exp_mu[gx * N + k] * exp_mu[gy * N + k]);
+	}
+
+}
+
+
+
 
