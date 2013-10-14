@@ -150,40 +150,40 @@ void run_opencl_em(HMM *word)
 	cl_mem beta_d		  		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
 	cl_mem B_d  		  		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
 	cl_mem beta_B_d 	  		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,    NULL, NULL);
-	cl_mem A_alpha_beta_B_d 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
+	cl_mem A_alpha_beta_B_d 		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
 	cl_mem alpha_d 				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
-	cl_mem A_d 					= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
+	cl_mem A_d 				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
 	cl_mem alpha_beta_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,    NULL, NULL);
 	cl_mem gamma_obs_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*T,  NULL, NULL); // D x T
 	cl_mem gamma_d				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL); // N x T
-	cl_mem observations_d		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*T,  NULL, NULL); // D x T
-	cl_mem observations_t_d		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*D,  NULL, NULL); // T x D
+	cl_mem observations_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*T,  NULL, NULL); // D x T
+	cl_mem observations_t_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*D,  NULL, NULL); // T x D
 
-	cl_mem gamma_state_sum_d	= clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float)*N,    NULL, NULL); // N 
+	cl_mem gamma_state_sum_d		= clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float)*N,    NULL, NULL); // N 
 	cl_mem exp_mu_d				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*N,  NULL, NULL); // D x N 
-	cl_mem gammaob_ob_t_d		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*D,  NULL, NULL); // D x D 
+	cl_mem gammaob_ob_t_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*D,  NULL, NULL); // D x D 
 	//cl_mem exp_mu_mul_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*D,  NULL, NULL); // D x D 
 
 	// warm up() device
 	float *dummy = (float*)malloc(sizeof(float));
 	cl_mem dummy_d= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float),  NULL, NULL);
 	for(i=0;i<50;++i){
-		err = clEnqueueWriteBuffer(queue, dummy_d, 		CL_TRUE, 	0, sizeof(float), 	dummy, 		0, NULL, NULL);
+		err = clEnqueueWriteBuffer(queue, dummy_d,CL_TRUE,0,sizeof(float),dummy,0, NULL, NULL);
 	}
 
 
 	// Initialize device memory
-	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 		0, NULL, &event[0]); 
+	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 	0, NULL, &event[0]); 
 	OCL_CHECK(err);
 	err = clEnqueueWriteBuffer(queue, beta_d, 	CL_TRUE, 	0, sizeof(float)*N*T, 	beta, 	0, NULL, NULL); 
 	OCL_CHECK(err);
-	err = clEnqueueWriteBuffer(queue, A_d, 	    CL_TRUE, 	0, sizeof(float)*N*N, 	A, 		0, NULL, NULL); 
+	err = clEnqueueWriteBuffer(queue, A_d, 	    	CL_TRUE, 	0, sizeof(float)*N*N, 	A,	0, NULL, NULL); 
 	OCL_CHECK(err);
 	err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*N*T, 	alpha, 	0, NULL, NULL); 
 	OCL_CHECK(err);
 	err = clEnqueueWriteBuffer(queue, observations_d, 	CL_TRUE, 	0, sizeof(float)*D*T, 	observations, 	0, NULL, NULL); 
 	OCL_CHECK(err);
-	err = clEnqueueWriteBuffer(queue, observations_t_d, 	CL_TRUE, 	0, sizeof(float)*T*D, 	observations_t, 	0, NULL, NULL); 
+	err = clEnqueueWriteBuffer(queue, observations_t_d, 	CL_TRUE, 	0, sizeof(float)*T*D, 	observations_t,	0, NULL, NULL); 
 	OCL_CHECK(err);
 
 	int chunks;
@@ -245,10 +245,10 @@ void run_opencl_em(HMM *word)
 	int window;
 	double tmp;
 
-/*
+
 	for(window = 0; window < (T-1) ; ++window)
 	{
-		printf("window = %d\n", window);
+	//	printf("window = %d\n", window);
 		// kernel 1
 		err = clSetKernelArg(kernel[0], 7, sizeof(int), &window);
 		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
@@ -314,7 +314,6 @@ void run_opencl_em(HMM *word)
 
 	//check_2d_f(gamma,N,T);
 
-
 	// save the expected prior
 	for(i=0;i<N;++i){
 		exp_prior[i] = gamma[i*T + 0];
@@ -335,9 +334,8 @@ void run_opencl_em(HMM *word)
 		gamma_state_sum[i]=(float)tmp;
 	}	
 
-*/
 	
-/*
+
 
 	//---------------------------------------
 	// maximization
@@ -546,7 +544,7 @@ void run_opencl_em(HMM *word)
 	gpuTime = (double)(gend -gstart)/1000000000.0;
 
 	printf("oclTime = %lf (s)\n", gpuTime );
-*/
+
 
 
 
@@ -566,7 +564,7 @@ void run_opencl_em(HMM *word)
 	clReleaseMemObject(gammaob_ob_t_d);
 	//clReleaseMemObject(exp_mu_mul_d);
 	
-	//clReleaseMemObject(dummy_d);
+	clReleaseMemObject(dummy_d);
 
 
 
@@ -599,7 +597,7 @@ void run_opencl_em(HMM *word)
 	free(exp_mu);
 	free(exp_sigma);
 	free(gamma_state_sum);
-	//free(dummy);
+	free(dummy);
 
 	return;
 }
