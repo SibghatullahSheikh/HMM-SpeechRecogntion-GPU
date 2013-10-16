@@ -1,7 +1,8 @@
-#pragma OPENCL EXTENSION cl_amd_fp64 : enable
+//#pragma OPENCL EXTENSION cl_amd_fp64 : enable
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 //#pragma OPENCL EXTENSION cl_amd_printf : enable
 
-
+#define TILE 16
 //---------------------------
 // Expectation kernels
 //--------------------------
@@ -100,14 +101,17 @@ __kernel void exp_mu_dev (
 // 				gamma_obs * observations_t = gammaob_ob_t   ( a * b = c )
 
 __kernel void gammaob_ob_t_dev (
-	__global float *gamma_obs,
-	__global float *observations_t,
-	__global float *gammaob_ob_t,
-	__constant float *gamma_state_sum,
-	const int D,
-	const int T,
-	const int k)
+		__global float *gamma_obs,
+		__global float *observations_t,
+		__global float *gammaob_ob_t,
+		__constant float *gamma_state_sum,
+		__local float *sma,
+		__local float *smb,
+		const int D,
+		const int T,
+		const int k)
 {
+/*
 	size_t gx = get_global_id(0); // i
 	size_t gy = get_global_id(1); // j
 	int n;
@@ -122,6 +126,42 @@ __kernel void gammaob_ob_t_dev (
 		gammaob_ob_t[gx * D + gy] = (float)tmp / gamma_state_sum[k];
 
 	}
+*/
+	// gamma_obs		[Row][m*TILE+ty]
+	// observations_t 	[m*TILE+tx][Col] 
+	int gx = get_global_id(0); 
+	int gy = get_global_id(1);
+
+	int bx = get_group_id(0);
+	int by = get_group_id(1);
+
+	int tx = get_local_id(0);
+	int ty = get_local_id(1);
+
+	int Row =  bx * TILE + tx;
+	int Col =  by * TILE + ty;
+
+	float sum = 0.f;        
+
+	int m,kk;
+
+	for ( m = 0; m < T/TILE ; ++m)
+	{
+		sma[tx * TILE + ty] = gamma_obs[Row * T + m * TILE + ty];        
+		smb[tx * TILE + ty] = observations_t[(m * TILE + tx) * T + Col];        
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+
+		for ( kk = 0; kk < TILE ; ++kk) 
+		{
+			sum += sma[tx * TILE + kk] * smb[kk * TILE + ty];
+		}
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
+
+	gammaob_ob_t[Row * D + Col] = sum/gamma_state_sum[k];
 
 }
 
