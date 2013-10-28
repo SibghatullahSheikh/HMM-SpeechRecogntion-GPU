@@ -159,12 +159,13 @@ int main(int argc, char*argv[])
 	float *A_t; // NxN
 	A_t = (float*)malloc(sizeof(float)*N*N);
 
+	log_likelihood = 0.0;
+
 	// start timing
 	tic(&cpu_timer);
 
 	transpose(A, A_t, N, T);	
 
-	log_likelihood = 0.0;
 
 
 	for(j=0;j<T;++j)
