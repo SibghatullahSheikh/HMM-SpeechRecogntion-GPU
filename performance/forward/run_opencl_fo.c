@@ -195,17 +195,20 @@ void run_opencl_fo(HMM *word)
 	size_t global_1[2];
 	local_1[0]= 16;
 	local_1[1]= 16;
-	global_1[0] = ((N+15)/16)*16;
-	global_1[1] = ((N+15)/16)*16;
+	//global_1[0] = ((N+15)/16)*16; // N
+	//global_1[1] = ((N+15)/16)*16; // N
+	global_1[0] =  N;
+	global_1[1] =  N;
 
 	err  = clSetKernelArg(kernel[0], 0, sizeof(cl_mem), &A_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[0], 1, sizeof(int), &N);
+
+	err |= clSetKernelArg(kernel[0], 1, sizeof(cl_mem), &At_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[0], 2, sizeof(int), &T);
+
+	err |= clSetKernelArg(kernel[0], 2, sizeof(float)*256, NULL);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	err |= clSetKernelArg(kernel[0], 3, sizeof(cl_mem), &At_d);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
 
 	// 2nd kernel
 	// initial alpha:  B x Prior 

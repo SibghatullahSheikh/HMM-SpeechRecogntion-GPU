@@ -26,7 +26,7 @@ do
     rm ./result/cpuTime_job_$i.txt
   fi
 	
-  for (( j = 1 ;  j <= 10 ; j =  j + 1 ))
+  for (( j = 1 ;  j <= 20 ; j =  j + 1 ))
   do
     ./ocl_fo -job $i >> ./result/job_$i.txt
   done

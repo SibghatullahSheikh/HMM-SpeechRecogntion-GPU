@@ -61,4 +61,4 @@ ocl_fo:  ocl_fo.c
 
 .PHONY: clean
 clean:
-	rm -rf $(PROG) ../../utils/ocl_utils.o ./result
+	rm -rf $(PROG) ../../utils/ocl_utils.o ./result  *.o

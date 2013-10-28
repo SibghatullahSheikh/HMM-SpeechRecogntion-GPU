@@ -1,42 +1,62 @@
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+//#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 //#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
 //#pragma OPENCL EXTENSION cl_khr_global_int32_extended_atomics : enable
 
 //#pragma OPENCL EXTENSION cl_amd_printf : enable
 
-/*
-void AtomicAdd(volatile __global float *source, const float operand)
+
+
+#define TILE 16
+
+__kernel void transpose(
+		__global float *A,
+		__global float *At,
+		__local  float *lds )
 {
-	union {
-		unsigned int intVal;
-		float floatVal;
-	} newVal;
+	// square matrix
+	size_t N  = get_global_size(0);
 
-	union {
-		unsigned int intVal;
-		float floatVal;
-	} prevVal;
+	size_t gx = get_group_id(0);
+	size_t gy = get_group_id(1);
 
-	do {
-		prevVal.floatVal = *source;
-		newVal.floatVal = prevVal.floatVal + operand;
-	} while (atomic_cmpxchg((volatile __global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
+	size_t blks_x = get_num_groups(0);
+
+	// reshuffle blocks
+	size_t giy = gx;
+	size_t gix = (gx + gy)%blks_x;
+
+	size_t lix = get_local_id(0);
+	size_t liy = get_local_id(1);
+
+	// use reshuffled blks to index the reading data
+	size_t ix = gix * TILE + lix;
+	size_t iy = giy * TILE + liy;
+
+	size_t index_in = ix + iy * N; // [iy][ix]
+
+	// copy from global memory to LDS
+	size_t ind = liy * TILE  + lix; //[liy][lix]
+
+	lds[ind]            =   A[index_in];
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	ix = giy * TILE + lix;
+	iy = gix * TILE + liy;
+
+	// transpose the index inside LDS
+	ind = lix * TILE  + liy; // [lix][liy]
+
+	int index_out = ix  + iy * N ;
+
+	At[index_out]           = lds[ind];
 }
-*/
 
-__kernel void transpose( 
-		__global float *a,
-		const int row,
-		const int col,
-		__global float *a_t)
-{
-	unsigned int x = get_global_id(0);
-	unsigned int y = get_global_id(1);
 
-	if (x < row && y < col ) {
-		a_t[y * row + x]= a[x * col + y] ;
-	}
-}
+
+
+
+
 
 
 __kernel void init_alpha(
@@ -105,8 +125,9 @@ __kernel void alpha_dev(
 	if (gid < nstates) 
 	{
 		int i;
-		double tmp;
-		tmp = 0.0;
+		//double tmp;
+		
+        float tmp = 0.f;
 		for(i = 0; i < nstates; ++i){
 			tmp += at_d[ gid*nstates + i] * alpha_d[i*T + tPos-1]; // opt: alpha_d can be in constant ?
 		}
@@ -173,8 +194,9 @@ __kernel void scale_alpha(
 	{
 		// accumulate sum	
 		int i;
-		double tmp = 0.0;
-		for(i=0;i<chunks;++i){
+		//double tmp = 0.0;
+		float tmp = 0.f;
+        for(i=0;i<chunks;++i){
 			tmp += alphamid_d[i];	
 		}
 		sum[0] = (float)tmp;
