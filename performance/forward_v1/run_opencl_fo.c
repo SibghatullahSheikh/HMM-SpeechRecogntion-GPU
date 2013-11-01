@@ -140,11 +140,11 @@ void run_opencl_fo(HMM *word)
 	kernel[1] = clCreateKernel(program, "init_alpha", &err);
 	OCL_CHECK(err);
 
-	kernel[2] = clCreateKernel(program, "mv_2", &err);
+	kernel[2] = clCreateKernel(program, "reduction", &err);
 	OCL_CHECK(err);
 
-	kernel[3] = clCreateKernel(program, "alpha_dev", &err);
-	OCL_CHECK(err);
+	//kernel[3] = clCreateKernel(program, "alpha_dev", &err);
+	//OCL_CHECK(err);
 
 
 	// allocate memory on device 
@@ -233,7 +233,7 @@ void run_opencl_fo(HMM *word)
 	// 2nd kernel:
 	size_t local_2;
 	size_t global_2;
-	local_2  =  64;
+	local_2  =  256;
 	global_2=  N;
 
 	err  = clSetKernelArg(kernel[1], 0, sizeof(cl_mem), &B_d);
@@ -251,7 +251,7 @@ void run_opencl_fo(HMM *word)
 	err |= clSetKernelArg(kernel[1], 4, sizeof(cl_mem), &alphasum_tmp_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err |= clSetKernelArg(kernel[1], 5, sizeof(float)*65, NULL);
+	err |= clSetKernelArg(kernel[1], 5, sizeof(float)*256, NULL);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 	err |= clSetKernelArg(kernel[1], 6, sizeof(int), &N);
@@ -261,6 +261,30 @@ void run_opencl_fo(HMM *word)
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 	err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, NULL );
+	OCL_CHECK(err);
+
+
+
+	// reduction kernel
+	size_t local_3 = 256;
+	size_t global_3 = N; // check (N/256) , around to 256 
+	
+	err  = clSetKernelArg(kernel[2], 0, sizeof(cl_mem), &alphasum_tmp_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[2], 1, sizeof(cl_mem), &alphasum_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[2], 2, sizeof(cl_mem), &lld);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	//err  = clSetKernelArg(kernel[2], 3, sizeof(float)*256, NULL);
+	//if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err  = clSetKernelArg(kernel[2], 3, sizeof(int), &blks);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, NULL );
 	OCL_CHECK(err);
 
 	//clFinish(queue);
@@ -281,7 +305,7 @@ void run_opencl_fo(HMM *word)
 	OCL_CHECK(err);
 */
 
-
+/*
 	// 3 kernel
 	// matrix vector multiplication
 	size_t local_3[2];
@@ -331,12 +355,14 @@ void run_opencl_fo(HMM *word)
 	err |= clSetKernelArg(kernel[3], 6, sizeof(cl_mem), &lld_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-
+*/
 
 	// ----------------------
 	// 
 	// ----------------------
 
+
+/*
 	uint startPos_pre;
 	uint startPos;
 
@@ -374,13 +400,13 @@ void run_opencl_fo(HMM *word)
 		printf("\n\n  (%d)  lld = %.4e\n", frame, lld[0]);
 	}
 
-
+*/
 
 	
-	clFinish(queue);
+	//clFinish(queue);
 
 	//clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , NULL);
-	clEnqueueReadBuffer(queue, lld_d, CL_TRUE, 0, sizeof(float), lld, 0, NULL , NULL);
+	//clEnqueueReadBuffer(queue, lld_d, CL_TRUE, 0, sizeof(float), lld, 0, NULL , NULL);
 	//clEnqueueReadBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*T*N, alpha, 0, NULL , NULL);
 
 	// check
@@ -389,7 +415,7 @@ void run_opencl_fo(HMM *word)
 	//}
 
 	//printf("\n\nalphasum = %.4e\n", alphasum[0]);
-	printf("\n\nlld = %.4e\n", lld[0]);
+	//printf("\n\nlld = %.4e\n", lld[0]);
 	
 
 

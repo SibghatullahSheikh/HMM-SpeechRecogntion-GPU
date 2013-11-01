@@ -108,21 +108,20 @@ __kernel void init_alpha(
 		const int N,
 		__global float *lld)
 {
-	// first 64 do redution
-	// second 64 save the original
-
 	size_t gid = get_global_id(0);
 	size_t lid = get_local_id(0);
 
-	size_t blks = get_num_groups(0);
-
-	float data;
-
-	//lds[lid] =  lds[lid + 64] = B[gid] * prior[gid];
-	lds[lid] =  data = B[gid] * prior[gid];
+	if(gid < N){
+		lds[lid] =  alpha[gid] = B[gid] * prior[gid];
+	}else{
+		lds[lid] = 0.f;
+	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
+	// reduction on 256 
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
 	if(lid <  32) {lds[lid] += lds[lid +  32];}
 	if(lid <  16) {lds[lid] += lds[lid +  16];}
 	if(lid <   8) {lds[lid] += lds[lid +   8];}
@@ -131,56 +130,51 @@ __kernel void init_alpha(
 	if(lid <   1) {lds[lid] += lds[lid +   1];}
 
 	if(lid == 0){
-		//atomic_add_global( &alphasum[0], lds[0]);	
 		alphasum_tmp[get_group_id(0)] = lds[0];
+		//printf("(%d) %.4e\n",lid,  lds[0]);
 	}
+}
 
-	barrier(CLK_GLOBAL_MEM_FENCE);
 
-	if(lid == 0)
-	{
-		int i;
-		float sum = 0.f;
-		#pragma unroll
-		for(i=0;i<blks;++i){
-			sum += alphasum_tmp[i]; 		
-		}
-		//alphasum[0] = sum;	
-		lds[64] = sum;
+__kernel void reduction(
+		__global float *alphasum_tmp,
+		__global float *alphasum,
+		__global float *lld,
+	//	__local volatile float *lds,
+		const int blks)
+{
 
-		if(gid == 0){
-			//alphasum[0] = sum;
-			lld[0] = log(sum);	
-		}
+	/*
+	size_t gid = get_global_id(0);
+	size_t lid = get_local_id(0);
+
+	if(gid < blks){
+		lds[lid] =  alphasum_tmp[gid];
+	}else{
+		lds[lid] = 0.f;
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-/*
+	// reduction on 256 
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
+	if(lid <  32) {lds[lid] += lds[lid +  32];}
+	if(lid <  16) {lds[lid] += lds[lid +  16];}
+	if(lid <   8) {lds[lid] += lds[lid +   8];}
+	if(lid <   4) {lds[lid] += lds[lid +   4];}
+	if(lid <   2) {lds[lid] += lds[lid +   2];}
+	if(lid <   1) {lds[lid] += lds[lid +   1];}
 
-	//printf("(%d)%f	%.4e\n",lid, lds[lid+64], alphasum[0]);
+	if(lid == 0){
+		alphasum[0] = lds[0];
+		printf("(%d) %.4e\n",lid,  lds[0]);
+		lld[0] += log(lds[0]);
+	}
 
-	//alpha[gid] = lds[64 + lid]/ alphasum[0];
-	alpha[gid] = data / alphasum[0];
-*/
-
-	alpha[gid] = data / lds[64];
-
-	//printf("(%d) %f,	%.4e\n",lid, lds[lid+64], alphasum[0]);
-	//printf("(%d) %f\n",lid, data);
+	*/
 }
 
-
-/*
-__kernel void check(__global float *alpha)
-{
-
-	size_t gid = get_global_id(0);
-
-	printf("(%d) 	%.4e\n",gid, alpha[gid]);
-
-}
-*/
 
 
 
