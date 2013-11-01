@@ -17,56 +17,48 @@ void run_opencl_fo(HMM *word)
 	int i;
 	int N = word->nstates;
 	int T = word->len;
-	float *B = word->b;
-	float *A = word->a;
+	float *B = word->b; // T x N
+	float *A = word->a; // N x N
 	float *prior = word->pri;
 
 	// gpu timer
-	cl_ulong gstart, gend;
-	double gpuTime;
+	//cl_ulong gstart, gend;
+	//double gpuTime;
 
 	// cpu timer
-	struct timeval cstart;
-	struct timeval cend;
-	double cpuTime;
+	//struct timeval cstart;
+	//struct timeval cend;
+	//double cpuTime;
 
 	float *At; // NxN
 	At = (float*)malloc(sizeof(float)*N*N);
 
+
 	// initialize for checking
 	float *alpha;
-	alpha = (float*)malloc(sizeof(float)*N*T);
-	init_2d_f(alpha,N,T,0.f);
+	alpha = (float*)malloc(sizeof(float)*T*N); // T x B
+	init_2d_f(alpha,T,N,0.f);
+
+
+	int blks = (N+63)/64;
+	//float *alphasum_tmp; 
+	//alphasum_tmp = (float*)malloc(sizeof(float)*(blks+1));
 
 	float *alphasum; // T x 1
 	alphasum = (float*)malloc(sizeof(float)*T);
-	init_1d_f(alpha,T,0.f);
+	init_1d_f(alphasum,T,0.f);
 
 
-	//-------------------------------------------
-	// assume the local size is always 64, to 
-	// avoid the AtomicAdd() which stops working
-	// after 15 loops for 256x256 case,
-	// the intermediate size can be known ahead
-	//-------------------------------------------
-	int chunks;
-	chunks = (N+63)/64;
-	float *alphamid;
-	alphamid = (float*)malloc(sizeof(float)*chunks);
+	float *lld; 
+	lld = (float*)malloc(sizeof(float));
+	lld[0] = 0.f;
 
 
+	int numK = 4;
+	int numE = 2;
 
-
-	//float *testsum;
-	//	testsum = (float *)malloc(sizeof(float)*16);
-	//	for(i=0;i<16;++i){
-	//		testsum[i] = 0.f;
-	//	}
-	//
-	//	printf("host\n");	
-	//	for(i=0;i<16;++i){
-	//		printf("%f ", testsum[i]);
-	//	}
+	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*numK);
+	cl_event *events = (cl_event*)malloc(sizeof(cl_event)*numE);    
 
 
 	//------------------------------------------------
@@ -78,10 +70,6 @@ void run_opencl_fo(HMM *word)
 	cl_command_queue queue;           // command queue
 	cl_program program;               // program
 
-	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*4);
-	
-	//cl_event *event = (cl_event*)malloc(sizeof(cl_event)*10);    // create events for profiling and concurrent cmdqueue
-	cl_event *event = (cl_event*)malloc(sizeof(cl_event)*2);    
 
 /*
 	cl_event **eventwait = (cl_event**)malloc(sizeof(cl_event*)*2);
@@ -141,6 +129,7 @@ void run_opencl_fo(HMM *word)
 		printCompilerOutput(program, device_id);
 	OCL_CHECK(err);
 
+
 	// 
 	kernel[0] = clCreateKernel(program, "transpose", &err);
 	OCL_CHECK(err);
@@ -148,24 +137,27 @@ void run_opencl_fo(HMM *word)
 	kernel[1] = clCreateKernel(program, "init_alpha", &err);
 	OCL_CHECK(err);
 
-	kernel[2] = clCreateKernel(program, "alpha_dev", &err);
+	kernel[2] = clCreateKernel(program, "mv_2", &err);
 	OCL_CHECK(err);
-	kernel[3] = clCreateKernel(program, "scale_alpha", &err);
+
+	kernel[3] = clCreateKernel(program, "alpha_dev", &err);
 	OCL_CHECK(err);
-//	kernel[3] = clCreateKernel(program, "test", &err);
-//	OCL_CHECK(err);
 
 
 	// allocate memory on device 
 	cl_mem A_d      	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
 	cl_mem At_d     	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
-	//cl_mem prior_d  	= clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float)*N,    NULL, NULL);
-	//cl_mem B_d      	= clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float)*N*T,  NULL, NULL);
-	cl_mem prior_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,   sizeof(float)*N,    NULL, NULL);
-	cl_mem B_d      	= clCreateBuffer(context, CL_MEM_READ_WRITE,   sizeof(float)*N*T,  NULL, NULL);
-	cl_mem alpha_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
+
+	cl_mem prior_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,    NULL, NULL);
+
+	cl_mem B_d      	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*N,  NULL, NULL);
+	cl_mem alpha_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*N,  NULL, NULL);
 	cl_mem alphasum_d   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T,  NULL, NULL);
-	cl_mem alphamid_d   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*chunks,  NULL, NULL);
+
+	cl_mem alphasum_tmp_d   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*blks,  NULL, NULL);
+	cl_mem lld_d   			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float),  NULL, NULL);
+
+	cl_mem at_alpha_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,    NULL, NULL);
 
 	// warm up() device
 	float *dummy = (float*)malloc(sizeof(float));
@@ -174,22 +166,28 @@ void run_opencl_fo(HMM *word)
 		err = clEnqueueWriteBuffer(queue, dummy_d, 		CL_TRUE, 	0, sizeof(float), 	dummy, 		0, NULL, NULL);
 	}
 
-	// Initialize device memory
-	err = clEnqueueWriteBuffer(queue, A_d, 		CL_TRUE, 	0, sizeof(float)*N*N, 	A, 		0, NULL, &event[0]);
+
+
+
+
+	// copy from host to device
+	err = clEnqueueWriteBuffer(queue, A_d, 		CL_TRUE, 	0, sizeof(float)*N*N, 	A, 		0, NULL, NULL);
 	OCL_CHECK(err);
-	//err = clEnqueueWriteBuffer(queue, prior_d, 	CL_TRUE, 	0, sizeof(float)*N, 	prior, 	0, NULL, &event[1]);      
+
 	err = clEnqueueWriteBuffer(queue, prior_d, 	CL_TRUE, 	0, sizeof(float)*N, 	prior, 	0, NULL, NULL);      
 	OCL_CHECK(err);
-	//err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 		0, NULL, &event[2]); 
-	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*N*T, 	B, 		0, NULL, NULL); 
+
+	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*T*N, 	B, 		0, NULL, NULL); 
 	OCL_CHECK(err);
-	//err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*N*T, 	alpha, 	0, NULL, &event[3]); 
-	err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*N*T, 	alpha, 	0, NULL, NULL); 
+
+	err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*T*N, 	alpha, 	0, NULL, NULL); 
 	OCL_CHECK(err);
-//	err = clEnqueueWriteBuffer(queue, alphasum_d, CL_TRUE, 	0, sizeof(float)*T, 	alphasum, 0, NULL, &event[4]);  
+
 	err = clEnqueueWriteBuffer(queue, alphasum_d, CL_TRUE, 	0, sizeof(float)*T, 	alphasum, 0, NULL, NULL);  
 	OCL_CHECK(err);
 
+	err = clEnqueueWriteBuffer(queue, lld_d, CL_TRUE, 	0, sizeof(float), 	lld, 0, NULL, NULL);  
+	OCL_CHECK(err);
 
 
 	//  1st kernel: transpose
@@ -197,8 +195,6 @@ void run_opencl_fo(HMM *word)
 	size_t global_1[2];
 	local_1[0]= 16;
 	local_1[1]= 16;
-	//global_1[0] = ((N+15)/16)*16; // N
-	//global_1[1] = ((N+15)/16)*16; // N
 	global_1[0] =  N;
 	global_1[1] =  N;
 
@@ -211,187 +207,175 @@ void run_opencl_fo(HMM *word)
 	err |= clSetKernelArg(kernel[0], 2, sizeof(float)*256, NULL);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-
-	// 2nd kernel
-	// initial alpha:  B x Prior 
-	size_t local_2 = 64;
-	size_t global_2 = chunks*64;
-
-	err = clSetKernelArg(kernel[1],     0,  sizeof(cl_mem),     &B_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[1],     1,  sizeof(cl_mem),     &prior_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[1],     2,  sizeof(cl_mem),     &alpha_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[1],     3,  sizeof(int),        &N);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[1],     4,  sizeof(int),        &T);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	//err = clSetKernelArg(kernel[1],     5,  sizeof(int),        &frame);
-	//if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[1],     6,  sizeof(cl_mem),      &alphamid_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[1],     7,  sizeof(float)*64,   NULL);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
-
-
-	// 3rd kernel
-	size_t local_3 = 64;
-	size_t global_3 = chunks*64;
-
-	err = clSetKernelArg(kernel[2],     0,  sizeof(cl_mem),     &B_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[2],     1,  sizeof(cl_mem),     &At_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[2],     2,  sizeof(cl_mem),     &alpha_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[2],     3,  sizeof(int),        &N);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[2],     4,  sizeof(int),        &T);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	//err = clSetKernelArg(kernel[2],     5,  sizeof(int),        &frame);
-	//if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[2],     6,  sizeof(cl_mem),      &alphamid_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[2],     7,  sizeof(float)*64,   NULL);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
-
-	// 4th kernel
-	size_t local_4 = 256;
-	size_t global_4 = ((N+255)/256)*256;
-
-	err = clSetKernelArg(kernel[3],     0,  sizeof(cl_mem),     &alpha_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[3],     1,  sizeof(cl_mem),      &alphasum_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[3],     2,  sizeof(cl_mem),      &alphamid_d);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[3],     3,  sizeof(int),        &N);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[3],     4,  sizeof(int),        &T);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-	err = clSetKernelArg(kernel[3],     6,  sizeof(int),        &chunks);
-	if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
+	err |= clSetKernelArg(kernel[0], 3, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 
 	// transpose kernel
-	//err = clEnqueueNDRangeKernel(queue, kernel[0], 2, NULL, global_1, local_1, 0, NULL, &event[5] );
 	err = clEnqueueNDRangeKernel(queue, kernel[0], 2, NULL, global_1, local_1, 0, NULL, NULL );
 	OCL_CHECK(err);
 
-
-	// time capsule
-	int frame;
-
-	for(frame = 0 ; frame < T; ++frame)
-	{
-
-		if(frame == 0)
-		{ // initialize
-			err = clSetKernelArg(kernel[1],     5,  sizeof(int),        &frame);
-			if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
-			err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, NULL);
-//			err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, &event[6]);
-			OCL_CHECK(err);
+//	clFinish(queue);
+//	clEnqueueReadBuffer(queue, At_d, CL_TRUE, 0, sizeof(float)*N*N, At, 0, NULL , NULL);
+//	// check
+//	for(i=0; i<N; ++i){
+//		printf("row = %d\n", i);
+//		int j;
+//		for(j=0; j<N; ++j){
+//		printf("%.4e\n", At[i*N+j]);
+//		}
+//	}
 
 
-			err = clSetKernelArg(kernel[3],     5,  sizeof(int),        &frame);
-			if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
+	// 2nd kernel:
+	size_t local_2;
+	size_t global_2;
+	local_2  =  64;
+	global_2=  N;
 
-			err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL);
-			//err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, &event[7]);
-			OCL_CHECK(err);
+	err  = clSetKernelArg(kernel[1], 0, sizeof(cl_mem), &B_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
+	err |= clSetKernelArg(kernel[1], 1, sizeof(cl_mem), &prior_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-			if( 0 )
-			{
-				clFinish(queue);
-				clEnqueueReadBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*N*T, alpha, 0, NULL, NULL);
-				clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL, NULL);
+	err |= clSetKernelArg(kernel[1], 2, sizeof(cl_mem), &alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-				puts("alpha");
-				for(i=0;i<N;++i){
-					printf("%f\n", alpha[i*T + frame]);	
-				}
+	err |= clSetKernelArg(kernel[1], 3, sizeof(cl_mem), &alphasum_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-				puts("alphasum");
-				printf("%f\n", alphasum[frame]);	
+	err |= clSetKernelArg(kernel[1], 4, sizeof(cl_mem), &alphasum_tmp_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-			}
+	err |= clSetKernelArg(kernel[1], 5, sizeof(float)*65, NULL);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-		}
-		else
-		{
-		
-		
-			//	if (frame == 1 && 1)
-			//	{
-					err = clSetKernelArg(kernel[2],     5,  sizeof(int),        &frame);
-					if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
+	err |= clSetKernelArg(kernel[1], 6, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-					err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, NULL);
-					//err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, &event[8]);
-					OCL_CHECK(err);
+	err |= clSetKernelArg(kernel[1], 7, sizeof(cl_mem), &lld_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
+	err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, NULL );
+	OCL_CHECK(err);
 
-				
-
-					err = clSetKernelArg(kernel[3],     5,  sizeof(int),        &frame);
-					if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
-					err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL);
-					//err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, &event[7]);
-					OCL_CHECK(err);
 
 /*
+	// 3rd kernel
+	size_t local_3;
+	size_t global_3;
+	local_3  =  64;
+	global_3=  N;
 
+	err  = clSetKernelArg(kernel[2], 0, sizeof(cl_mem), &alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-				}
-
-				if( frame == 14)
-				{
-					err = clSetKernelArg(kernel[2],     5,  sizeof(int),        &frame);
-					if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
-					err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, NULL);
-					OCL_CHECK(err);
-
-
-					err = clSetKernelArg(kernel[3],     5,  sizeof(int),        &frame);
-					if(err != 0) { printf("%d\n",err);  OCL_CHECK(err); exit(1);}
-
-					err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL);
-					OCL_CHECK(err);
-
-
-					clFinish(queue);
-					clEnqueueReadBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*N*T, alpha, 0, NULL, NULL);
-					clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL, NULL);
-
-					puts("alpha");
-					for(i=0;i<N;++i){
-						printf("%f\n", alpha[i*T + frame]);	
-					}
-
-					puts("alphasum");
-					printf("%f\n", alphasum[frame]);	
-
-				}
-
+	err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &global_3, &local_3, 0, NULL, NULL );
+	OCL_CHECK(err);
 */
-		
-		}
+
+
+	// 3 kernel
+	// matrix vector multiplication
+	size_t local_3[2];
+	size_t global_3[2];
+	local_3[0]= 16;
+	local_3[1]= 16;
+	global_3[0] =  16;
+	global_3[1] =  N;
+
+	err = clSetKernelArg(kernel[2], 0, sizeof(cl_mem), &At_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[2], 1, sizeof(cl_mem), &alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[2], 2, sizeof(cl_mem), &at_alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[2], 3, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+
+	// 4 kernel
+	size_t local_4;
+	size_t global_4;
+	local_4	 = 64;
+	global_4 =  N;
+
+	err = clSetKernelArg(kernel[3], 0, sizeof(cl_mem), &B_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[3], 1, sizeof(cl_mem), &at_alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[3], 2, sizeof(cl_mem), &alphasum_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[3], 3, sizeof(cl_mem), &alphasum_tmp_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[3], 4, sizeof(float)*65, NULL);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[3], 5, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err |= clSetKernelArg(kernel[3], 6, sizeof(cl_mem), &lld_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+
+
+	// ----------------------
+	// 
+	// ----------------------
+
+	uint startPos_pre;
+	uint startPos;
+
+	int frame;
+	for(frame = 1 ; frame < T; ++frame)
+	{
+		startPos     = frame * N;
+		startPos_pre = startPos - N;
+
+		err = clSetKernelArg(kernel[2], 4, sizeof(uint), &startPos_pre);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+		// At x B
+		err = clEnqueueNDRangeKernel(queue, kernel[2], 2, NULL, global_3, local_3, 0, NULL, NULL );
+		OCL_CHECK(err);
+
+
+		err = clSetKernelArg(kernel[3], 7, sizeof(uint), &startPos);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+		err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL );
+		OCL_CHECK(err);
 
 	}
 
 
 
+	
 	clFinish(queue);
 
+	//clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , NULL);
+	clEnqueueReadBuffer(queue, lld_d, CL_TRUE, 0, sizeof(float), lld, 0, NULL , NULL);
+	//clEnqueueReadBuffer(queue, alpha_d, CL_TRUE, 0, sizeof(float)*T*N, alpha, 0, NULL , NULL);
+
+	// check
+	//for(i=0; i<N; ++i){
+	//	printf("%.4e\n", alpha[i]);
+	//}
+
+	//printf("\n\nalphasum = %.4e\n", alphasum[0]);
+	printf("\n\nlld = %.4e\n", lld[0]);
+	
+
+
+/*
 	//clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , &event[9]);
 	clEnqueueReadBuffer(queue, alphasum_d, CL_TRUE, 0, sizeof(float)*T, alphasum, 0, NULL , &event[1]);
 
@@ -428,31 +412,41 @@ void run_opencl_fo(HMM *word)
 
 	printf("log_likelihood = %lf\n", log_likelihood);
 
-
+*/
 
 
 	clReleaseMemObject(A_d);
 	clReleaseMemObject(At_d);
-	clReleaseMemObject(prior_d);
-	clReleaseMemObject(B_d);
 	clReleaseMemObject(alpha_d);
 	clReleaseMemObject(alphasum_d);
-	clReleaseMemObject(alphamid_d);
+	clReleaseMemObject(alphasum_tmp_d);
+	clReleaseMemObject(lld_d);
+
+
+	clReleaseMemObject(at_alpha_d);
+	clReleaseMemObject(B_d);
+	clReleaseMemObject(prior_d);
+
+	//clReleaseMemObject(alphamid_d);
 
 	clReleaseMemObject(dummy_d);
 
 	clReleaseProgram(program);
 	clReleaseContext(context);
 	clReleaseCommandQueue(queue);
-	for(i=0;i<4;++i){
+	for(i=0;i<numK;++i){
 		clReleaseKernel(kernel[i]);
+	}
+	for(i=0;i<numE;++i){
+		clReleaseEvent(events[i]);
 	}
 
 	free(kernelSource);
 	free(At);
 	free(alpha);
 	free(alphasum);
-	free(alphamid);
+	free(lld);
+	//free(alphamid);
 
 	free(dummy);
 
