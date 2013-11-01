@@ -147,9 +147,10 @@ __kernel void init_alpha(
 		}
 		//alphasum[0] = sum;	
 		lds[64] = sum;
-		lld[0] = log(sum);	
+
 		if(gid == 0){
-			alphasum[0] = sum;
+			//alphasum[0] = sum;
+			lld[0] = log(sum);	
 		}
 	}
 
@@ -246,6 +247,8 @@ __kernel void alpha_dev(
 
 	float data;
 
+	//printf("(%d) , %.4e\n",gid,  lld[0]);
+
 	// lds[65]
 	lds[lid] =  data = B[startPos + gid] * at_alpha[gid];
 
@@ -274,16 +277,18 @@ __kernel void alpha_dev(
 		}
 		//alphasum[0] = sum;	
 		lds[64] = sum;
-		lld[0] += log(sum);	
 
-		//if(gid == 0){ 
-		//	alphasum[0] = sum;
-		//}
+		if(gid == 0){ 
+			lld[0] += log(sum);	
+		}
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
+	//printf("(%d) %f,	%.4e\n",gid, data , lld[0]);
+
 	alpha[startPos + gid] = data / lds[64];
+
 }
 
 

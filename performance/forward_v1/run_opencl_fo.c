@@ -53,6 +53,9 @@ void run_opencl_fo(HMM *word)
 	lld = (float*)malloc(sizeof(float));
 	lld[0] = 0.f;
 
+	float *at_alpha; 
+	at_alpha = (float*)malloc(sizeof(float)*N);
+
 
 	int numK = 4;
 	int numE = 2;
@@ -260,6 +263,9 @@ void run_opencl_fo(HMM *word)
 	err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_2, &local_2, 0, NULL, NULL );
 	OCL_CHECK(err);
 
+	//clFinish(queue);
+	//clEnqueueReadBuffer(queue, lld_d, CL_TRUE, 0, sizeof(float), lld, 0, NULL , NULL);
+	//printf("\n\nlld = %.4e\n", lld[0]);
 
 /*
 	// 3rd kernel
@@ -335,6 +341,7 @@ void run_opencl_fo(HMM *word)
 	uint startPos;
 
 	int frame;
+	//for(frame = 1 ; frame < 2; ++frame)
 	for(frame = 1 ; frame < T; ++frame)
 	{
 		startPos     = frame * N;
@@ -348,12 +355,23 @@ void run_opencl_fo(HMM *word)
 		OCL_CHECK(err);
 
 
+		//clFinish(queue);
+
+		//clEnqueueReadBuffer(queue, at_alpha_d, CL_TRUE, 0, sizeof(float)*N, at_alpha, 0, NULL , NULL);
+
+		//for(i=0; i<N; ++i){
+		//	printf("%.4e\n", at_alpha[i]);
+		//}	
+
 		err = clSetKernelArg(kernel[3], 7, sizeof(uint), &startPos);
 		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 		err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_4, &local_4, 0, NULL, NULL );
 		OCL_CHECK(err);
 
+		clFinish(queue);
+		clEnqueueReadBuffer(queue, lld_d, CL_TRUE, 0, sizeof(float), lld, 0, NULL , NULL);
+		printf("\n\n  (%d)  lld = %.4e\n", frame, lld[0]);
 	}
 
 
@@ -446,7 +464,8 @@ void run_opencl_fo(HMM *word)
 	free(alpha);
 	free(alphasum);
 	free(lld);
-	//free(alphamid);
+
+	free(at_alpha);
 
 	free(dummy);
 
