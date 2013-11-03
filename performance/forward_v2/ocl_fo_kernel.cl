@@ -34,8 +34,6 @@ void atomic_add_global(volatile global float *source, const float operand) {
 
 #define TILE 16
 
-
-
 //----------------------------------------------------------------------
 // 1st kernel
 //----------------------------------------------------------------------
@@ -89,80 +87,45 @@ __kernel void transpose(
 // 2nd kernel
 //----------------------------------------------------------------------
 
-//----------------------------------------
 // B should be T x N
 // prior is vector
 // alpha should be T x N either
-// localsize = 128 
-// globalsize = N , where N is multpile of 64
-//----------------------------------------
+// localsize = 256 
+// globalsize = 256 
+
 
 // run job 2
 __kernel void init_alpha(
 		__global float *B, // use no contant memory for general purpose
 		__global float *prior,
 		__global float *alpha,
-		__global float *alphasum_tmp,
-		__local volatile float *lds,
-		const int N)
-{
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-
-	if(gid < N){
-		lds[lid] =  alpha[gid] = B[gid] * prior[gid];
-		//printf("(%d) %.4e\n",gid,  alpha[gid]);
-	}else{
-		lds[lid] = 0.f;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// reduction on 256 
-	if(lid < 128) {lds[lid] += lds[lid + 128];}
-	if(lid <  64) {lds[lid] += lds[lid +  64];}
-	if(lid <  32) {lds[lid] += lds[lid +  32];}
-	if(lid <  16) {lds[lid] += lds[lid +  16];}
-	if(lid <   8) {lds[lid] += lds[lid +   8];}
-	if(lid <   4) {lds[lid] += lds[lid +   4];}
-	if(lid <   2) {lds[lid] += lds[lid +   2];}
-	if(lid <   1) {lds[lid] += lds[lid +   1];}
-
-	if(lid == 0){
-		alphasum_tmp[get_group_id(0)] = lds[0];
-		//printf("(%d) %.4e\n",lid,  lds[0]);
-	}
-}
-
-
-__kernel void reduction(
-		__global float *alphasum_tmp,
-		__global float *alphasum,
-		__global float *lld,
 		__local volatile float *lds,
 		const int blks)
 {
-	size_t gid = get_global_id(0);
+	// 256 
+	//size_t gid = get_global_id(0);
 	size_t lid = get_local_id(0);
+	size_t gid;
+	float data;
 
-	if(gid < blks){
-		lds[lid] =  alphasum_tmp[gid];
-		//printf("(%d) %.4e\n",lid,  alphasum_tmp[gid]);
-	}else{
-		lds[lid] = 0.f;
+	lds[lid] = 0.f;
+
+	// fetch data to lds
+	int i;
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;	
+		data = B[gid] * prior[gid];
+		alpha[gid] = data;
+		lds[lid] += data;
 	}
-
-	//printf("(%d) %.4e\n",lid,  alphasum_tmp[0]);
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// reduction on 256 
 	if(lid < 128) {lds[lid] += lds[lid + 128];}
-	//barrier(CLK_LOCAL_MEM_FENCE);
-
 	if(lid <  64) {lds[lid] += lds[lid +  64];}
-	//barrier(CLK_LOCAL_MEM_FENCE);
-
 	if(lid <  32) {lds[lid] += lds[lid +  32];}
 	if(lid <  16) {lds[lid] += lds[lid +  16];}
 	if(lid <   8) {lds[lid] += lds[lid +   8];}
@@ -171,22 +134,19 @@ __kernel void reduction(
 	if(lid <   1) {lds[lid] += lds[lid +   1];}
 
 	if(lid == 0){
-		alphasum[0] = lds[0];
-		lld[0] += log(lds[0]);
-		//printf("(%d) %.4e\n",lid,  alphasum[0]);
-		//printf("(%d) %.4e\n",lid,  lld[0]);
+		//alphasum[0] = lds[0];
+		//printf("(%d) %.4e\n",lid,  lds[0]);
+		data = lds[0];
 	}
 
-}
+	// normalise
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;	
+		alpha[gid] /= data;
+	}
 
-__kernel void normalise(
-		__global float *alpha,
-		__global float *alphasum,
-		const  uint startPos)
-{
-	size_t gid = get_global_id(0);
-	alpha[startPos + gid] /= alphasum[0];
-	//printf("(%d) %.4e\n",gid,  alpha[startPos + gid]);
 }
 
 
@@ -233,7 +193,6 @@ __kernel void mat_vec(
 		//printf("(%d) %.4e\n",gy,  out[gy]);
 	}
 
-
 }
 
 
@@ -243,20 +202,26 @@ __kernel void alpha_dev(
 		__global float *B, // use no contant memory for general purpose
 		__global float *at_alpha,
 		__global float *alpha,
-		__global float *alphasum_tmp,
 		__local volatile float *lds,
 		const int N,
+		const int blks,
 		const uint startPos)
 {
-
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-
-	size_t blks = get_num_groups(0);
-
-
 	// lds[256]
-	lds[lid] = alpha[startPos + gid] = B[startPos + gid] * at_alpha[gid];
+	size_t lid = get_local_id(0);
+	float data;
+	lds[lid] = 0.f;
+
+	int i;
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i * 256 + lid;
+		data = B[gid] * at_alpha[gid];
+		alpha[startPos + gid] = data;
+		lds[lid] += data;
+	}
+	// lds[256]
 	//printf("(%d) , %.4e\n",gid,  alpha[gid]);
 	barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -270,7 +235,16 @@ __kernel void alpha_dev(
 	if(lid <   1) {lds[lid] += lds[lid +   1];}
 
 	if(lid == 0){
-		alphasum_tmp[get_group_id(0)] = lds[0];
+		//alphasum_tmp[get_group_id(0)] = lds[0];
+		data = lds[0];
+	}
+
+	// normalise
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;	
+		alpha[startPos + gid] /= data;
 	}
 
 }
