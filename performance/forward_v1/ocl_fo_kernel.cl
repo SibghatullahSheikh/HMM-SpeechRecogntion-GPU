@@ -102,17 +102,16 @@ __kernel void init_alpha(
 		__global float *B, // use no contant memory for general purpose
 		__global float *prior,
 		__global float *alpha,
-		__global float *alphasum,
 		__global float *alphasum_tmp,
 		__local volatile float *lds,
-		const int N,
-		__global float *lld)
+		const int N)
 {
 	size_t gid = get_global_id(0);
 	size_t lid = get_local_id(0);
 
 	if(gid < N){
 		lds[lid] =  alpha[gid] = B[gid] * prior[gid];
+		//printf("(%d) %.4e\n",gid,  alpha[gid]);
 	}else{
 		lds[lid] = 0.f;
 	}
@@ -140,25 +139,30 @@ __kernel void reduction(
 		__global float *alphasum_tmp,
 		__global float *alphasum,
 		__global float *lld,
-	//	__local volatile float *lds,
+		__local volatile float *lds,
 		const int blks)
 {
-
-	/*
 	size_t gid = get_global_id(0);
 	size_t lid = get_local_id(0);
 
 	if(gid < blks){
 		lds[lid] =  alphasum_tmp[gid];
+		//printf("(%d) %.4e\n",lid,  alphasum_tmp[gid]);
 	}else{
 		lds[lid] = 0.f;
 	}
+
+	//printf("(%d) %.4e\n",lid,  alphasum_tmp[0]);
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// reduction on 256 
 	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	//barrier(CLK_LOCAL_MEM_FENCE);
+
 	if(lid <  64) {lds[lid] += lds[lid +  64];}
+	//barrier(CLK_LOCAL_MEM_FENCE);
+
 	if(lid <  32) {lds[lid] += lds[lid +  32];}
 	if(lid <  16) {lds[lid] += lds[lid +  16];}
 	if(lid <   8) {lds[lid] += lds[lid +   8];}
@@ -168,17 +172,25 @@ __kernel void reduction(
 
 	if(lid == 0){
 		alphasum[0] = lds[0];
-		printf("(%d) %.4e\n",lid,  lds[0]);
 		lld[0] += log(lds[0]);
+		//printf("(%d) %.4e\n",lid,  alphasum[0]);
+		//printf("(%d) %.4e\n",lid,  lld[0]);
 	}
 
-	*/
+}
+
+__kernel void normalise(
+		__global float *alpha,
+		__global float *alphasum,
+		const  uint startPos)
+{
+	size_t gid = get_global_id(0);
+	alpha[startPos + gid] /= alphasum[0];
+	//printf("(%d) %.4e\n",gid,  alpha[startPos + gid]);
 }
 
 
-
-
-__kernel void mv_2(
+__kernel void mat_vec(
 		__global float *At, 
 		__global float *alpha, 
 		__global float *out, 
@@ -200,7 +212,7 @@ __kernel void mv_2(
 	size_t start = ly * TILE;
 
 	int i;
-	lds[ly*TILE + lx] = 0.f;
+	lds[start + lx] = 0.f;
 
 	#pragma unroll
 	for(i = 0 ; i<m ; ++i){
@@ -213,8 +225,12 @@ __kernel void mv_2(
 	// sum across rows
 	if( gx == 0)
 	{
-		out[gy] = lds[start]                 + lds[start + 1] + lds[start + 2]         + lds[start + 3]  + lds[start + 4]  + lds[start + 5]  + lds[start + 6]  + lds[start + 7] + 
-			lds[start + 8]         + lds[start + 9] + lds[start + 10]        + lds[start + 11] + lds[start + 12] + lds[start + 13] + lds[start + 14] + lds[start + 15]; 
+		out[gy] = lds[start] + lds[start + 1] + lds[start + 2] + lds[start + 3] 
+			    + lds[start + 4]  + lds[start + 5] + lds[start + 6]  + lds[start + 7] 
+				+ lds[start + 8]  + lds[start + 9] + lds[start + 10] + lds[start + 11] 
+				+ lds[start + 12] + lds[start + 13] + lds[start + 14] + lds[start + 15]; 
+
+		//printf("(%d) %.4e\n",gy,  out[gy]);
 	}
 
 
@@ -230,7 +246,6 @@ __kernel void alpha_dev(
 		__global float *alphasum_tmp,
 		__local volatile float *lds,
 		const int N,
-		__global float *lld,
 		const uint startPos)
 {
 
@@ -239,15 +254,14 @@ __kernel void alpha_dev(
 
 	size_t blks = get_num_groups(0);
 
-	float data;
 
-	//printf("(%d) , %.4e\n",gid,  lld[0]);
-
-	// lds[65]
-	lds[lid] =  data = B[startPos + gid] * at_alpha[gid];
-
+	// lds[256]
+	lds[lid] = alpha[startPos + gid] = B[startPos + gid] * at_alpha[gid];
+	//printf("(%d) , %.4e\n",gid,  alpha[gid]);
 	barrier(CLK_LOCAL_MEM_FENCE);
 
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
 	if(lid <  32) {lds[lid] += lds[lid +  32];}
 	if(lid <  16) {lds[lid] += lds[lid +  16];}
 	if(lid <   8) {lds[lid] += lds[lid +   8];}
@@ -259,381 +273,9 @@ __kernel void alpha_dev(
 		alphasum_tmp[get_group_id(0)] = lds[0];
 	}
 
-	barrier(CLK_GLOBAL_MEM_FENCE);
-
-	if(lid == 0)
-	{
-		int i;
-		float sum = 0.f;
-		#pragma unroll
-		for(i=0;i<blks;++i){
-			sum += alphasum_tmp[i]; 		
-		}
-		//alphasum[0] = sum;	
-		lds[64] = sum;
-
-		if(gid == 0){ 
-			lld[0] += log(sum);	
-		}
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	//printf("(%d) %f,	%.4e\n",gid, data , lld[0]);
-
-	alpha[startPos + gid] = data / lds[64];
-
 }
 
 
 
 
-/*
-
-
-__kernel void alpha_dev(
-		__global float *At,
-		__global float *alpha,
-		__global float *B,
-		__local  float *lds,
-		const    int N, 
-		const    int T)
-{
-	// hint: fetch B to local        
-	size_t gx = get_global_id(0); // col  
-	size_t gy = get_global_id(1); // row 
-
-	size_t lx = get_local_id(0); // col  
-	size_t ly = get_local_id(1); // row 
-
-	size_t m =  N/TILE;
-
-
-	int t;
-	for( t = 1 ;  t < T ; ++t)
-	{ // go through each time frame (rows)
-
-		float offset = (t-1)*N;
-		float currentRow = offset + N;
-
-		lds[ly*TILE + lx] = 0.0;
-
-		// matrix x vector
-		int i;
-		for(i = 0 ; i<m ; ++i){
-			lds[ly*TILE + lx] += At[gy * N + lx + i*TILE] * alpha[offset + lx + i*TILE];
-		}
-
-		barrier(CLK_LOCAL_MEM_FENCE);
-
-		// sum across rows
-		if( gx == 0)
-		{
-			int start = ly * TILE;
-			float tmp;
-			tmp = lds[start] + lds[start + 1] + lds[start + 2] + lds[start + 3] + lds[start + 4] + lds[start + 5]  + lds[start + 6]  + lds[start + 7] + lds[start + 8] + lds[start + 9] + lds[start + 10] + lds[start + 11] + lds[start + 12] + lds[start + 13] + lds[start + 14] + lds[start + 15]; 
-			// vector multiply
-			alpha[currentRow + gy] = tmp * B[currentRow + gy];
-		}
-	
-		barrier(CLK_GLOBAL_MEM_FENCE);
-	
-	}
-
-}
-
-*/
-
-
-
-/*
-// sum alpha along each row 
-// localsize 16/16, global 16/N
-__kernel void sum_alpha(
-		__global float *alpha,
-		__global float *alphasum,
-		const int N)
-{
-
-	size_t gx = get_global_id(0); // col  
-	size_t gy = get_global_id(1); // row 
-
-	size_t lx = get_local_id(0); // col  
-	size_t ly = get_local_id(1); // row 
-
-	size_t m =  N/TILE;
-
-	__local volatile float lds[256];
-
-	size_t currentRow = gy*N;
-
-	lds[ly*TILE + lx] = 0.0;
-
-	int i;
-	for(i = 0 ; i<m ; ++i){
-		lds[ly*TILE + lx] += alpha[currentRow + lx + i*TILE];
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	if( gx == 0)
-	{
-		int start = ly * TILE;
-		alphasum[gy] = lds[start] + lds[start + 1] + lds[start + 2] + lds[start + 3] + lds[start + 4] + lds[start + 5]  + lds[start + 6]  + lds[start + 7] + lds[start + 8] + lds[start + 9] + lds[start + 10] + lds[start + 11] + lds[start + 12] + lds[start + 13] + lds[start + 14] + lds[start + 15]; 
-	}
-
-}
-
-*/
-
-
-/*
-// scale alpha
-// T should be at least 2
-__kernel void scale_lilkelihood(
-		__global float *alpha,		
-		__global float *alphasum,		
-		__global float *lld,
-		const int N,
-		const int T
-		)
-{
-	// localsize  64 ,  global size N
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-
-	size_t currentRow = 0;
-	alpha[gid] /= alphasum[0];
-
-	lld[0] = alphasum[0];
-
-	int i;
-	for( t = 1 ;  t < T ; ++t)
-	{
-		// scale along current row	
-		currentRow =  t * N;
-		alpha[currentRow + gid] /= alphasum[t];
-
-		if(gid == 0){
-			lld[t] = alphasum[t]/alphasum[t-1];
-		}
-	}
-
-}
-
-*/
-
-
-
-
-/*
-
-__kernel void init_alpha(
-		__global float *b_d, // use no contant memory for general purpose
-		__global float *pi_d,
-		__global float *alpha_d,
-		const int nstates,
-		const int T,
-		int tPos,
-		__global float *alphamid_d,
-		__local float *sm)
-{
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-	size_t stride = gid*T;
-
-	if (gid < nstates) {
-		sm[lid] = alpha_d[tPos + stride] = b_d[tPos + stride] * pi_d[gid];
-	}else{
-		sm[lid] = 0.f;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// scaling
-	if(lid<32){
-		volatile __local float *sm1 = sm;
-		sm1[lid] += sm1[lid + 32];
-		sm1[lid] += sm1[lid + 16];
-		sm1[lid] += sm1[lid +  8];
-		sm1[lid] += sm1[lid +  4];
-		sm1[lid] += sm1[lid +  2];
-		sm1[lid] += sm1[lid +  1];
-	}
-
-	if(lid == 0) {
-		//AtomicAdd(&alphasum_d[tPos], sm[0]);
-		alphamid_d [get_group_id(0) ] = sm[0];
-	}
-
-	//barrier(CLK_GLOBAL_MEM_FENCE);
-	//if (gid < nstates) {
-	//	alpha_d[stride + tPos]  = alpha_d[stride + tPos] / alphasum_d[tPos];
-	//}
-
-}
-
-*/
-
-
-/*
-__kernel void alpha_dev(
-		__global float *b_d, // same reason 
-		__global float *at_d,
-		__global float *alpha_d,
-				const int nstates,
-				const int T,
-				int tPos,
-		__global float *alphamid_d,
-		__local  float *sm)
-{
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-	size_t stride = gid*T;
-
-	if (gid < nstates) 
-	{
-		int i;
-		//double tmp;
-		
-        float tmp = 0.f;
-		for(i = 0; i < nstates; ++i){
-			tmp += at_d[ gid*nstates + i] * alpha_d[i*T + tPos-1]; // opt: alpha_d can be in constant ?
-		}
-
-		//sm[lid] = alpha_d[stride + tPos] = tmp * b_d[stride + tPos];
-		alpha_d[stride + tPos] = tmp * b_d[stride + tPos];
-
-	}
-	
-	else{
-	
-		sm[lid] = 0.f;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-	// scaling
-	if(lid<32){
-		volatile __local float *sm1 = sm;
-		sm1[lid] += sm1[lid + 32];
-		sm1[lid] += sm1[lid + 16];
-		sm1[lid] += sm1[lid +  8];
-		sm1[lid] += sm1[lid +  4];
-		sm1[lid] += sm1[lid +  2];
-		sm1[lid] += sm1[lid +  1];
-	}
-
-	if(lid == 0) {
-		alphamid_d [ get_group_id(0) ] = sm[0];
-	}
-	barrier(CLK_GLOBAL_MEM_FENCE);
-
-	if (gid < nstates) {
-		alpha_d[stride + tPos]  = alpha_d[stride + tPos] / alphasum_d[tPos];
-	}
-
-}
-*/
-
-
-
-
-/*
-__kernel void scale_alpha(
-	__global float *alpha_d,
-	__global float *alphasum_d,
-	__global float *alphamid_d,
-	const int nstates,
-	const int T,
-	int tPos,
-	const int chunks)
-{
-	size_t gid = get_global_id(0);
-	size_t lid = get_local_id(0);
-	size_t stride = gid*T;
-
-
-	// this is non-efficient, but better than transfering data back to host
-	__local float sum[1];
-
-	if(lid == 0 )
-	{
-		// accumulate sum	
-		int i;
-		//double tmp = 0.0;
-		float tmp = 0.f;
-        for(i=0;i<chunks;++i){
-			tmp += alphamid_d[i];	
-		}
-		sum[0] = (float)tmp;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	if(gid == 0)
-	{
-		alphasum_d[tPos] = sum[0];
-	}
-
-
-	if (gid < nstates) 
-	{
-		alpha_d[stride + tPos]  = alpha_d[stride + tPos] / sum[0];
-	}
-
-}
-*/
-
-
-//__kernel void test(__global float *alphasum_d)
-//{
-//	size_t gid = get_global_id(0);
-//
-//	if(gid < 16){
-//		//atomic_add(&testsum_d[15], 1.0f);
-//		AtomicAdd(&alphasum_d[0], 1.0f);
-//	}
-// //	testsum_d[gid] += 1;
-//
-//}
-
-
-/*
-
-__kernel void scale_alpha_dev()
-{	
-
-	// hint: fetch B to local        
-	size_t gx = get_global_id(0); // col  
-	size_t gy = get_global_id(1); // row 
-
-	size_t lx = get_local_id(0); // col  
-	size_t ly = get_local_id(1); // row 
-
-	size_t m =  N/TILE;
-
-	int i;
-	lds[ly*TILE + lx] = 0.0;
-	for(i = 0 ; i<m ; ++i){
-		lds[ly*TILE + lx]  += A[gy * N + lx + i*TILE] * B[lx + i*TILE];
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// sum across rows
-	if( gx == 0)
-	{
-		int start = ly * TILE;
-		float tmp;
-		tmp = lds[start]                 + lds[start + 1] + lds[start + 2]         + lds[start + 3]  + lds[start + 4]  + lds[start + 5]  + lds[start + 6]  + lds[start + 7] + 
-			lds[start + 8]         + lds[start + 9] + lds[start + 10]        + lds[start + 11] + lds[start + 12] + lds[start + 13] + lds[start + 14] + lds[start + 15]; 
-
-			tmp * B[gy];
-	}
-
-
-
-}
-
-*/
 
