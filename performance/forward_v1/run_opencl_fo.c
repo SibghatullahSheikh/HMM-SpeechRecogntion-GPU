@@ -25,11 +25,6 @@ void run_opencl_fo(HMM *word)
 
 	int i;
 
-	// cpu timer
-	//struct timeval cstart;
-	//struct timeval cend;
-	//double cpuTime;
-
 	float *At; // NxN
 	At = (float*)malloc(sizeof(float)*N*N);
 
@@ -41,15 +36,9 @@ void run_opencl_fo(HMM *word)
 
 
 	int blks = (N+255)/256;
-	//float *alphasum_tmp; 
-	//alphasum_tmp = (float*)malloc(sizeof(float)*(blks+1));
 
 	float *alphasum; // T x 1
 	alphasum = (float*)malloc(sizeof(float)*T);
-	//init_1d_f(alphasum,T,0.f);
-
-	float *tmpdata; // T x 1
-	tmpdata = (float*)malloc(sizeof(float)*N);
 
 	float *lld; 
 	lld = (float*)malloc(sizeof(float));
@@ -158,9 +147,7 @@ void run_opencl_fo(HMM *word)
 	// allocate memory on device 
 	cl_mem A_d      	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
 	cl_mem At_d     	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
-
 	cl_mem prior_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,    NULL, NULL);
-
 	cl_mem B_d      	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*N,  NULL, NULL);
 	cl_mem alpha_d  	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*N,  NULL, NULL);
 	cl_mem alphasum_d   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T,  NULL, NULL);
@@ -443,15 +430,13 @@ void run_opencl_fo(HMM *word)
 	clReleaseMemObject(alphasum_d);
 	clReleaseMemObject(alphasum_tmp_d);
 	clReleaseMemObject(lld_d);
-
-
 	clReleaseMemObject(at_alpha_d);
 	clReleaseMemObject(B_d);
 	clReleaseMemObject(prior_d);
+	clReleaseMemObject(dummy_d);
 
 	//clReleaseMemObject(alphamid_d);
 
-	clReleaseMemObject(dummy_d);
 
 	clReleaseProgram(program);
 	clReleaseContext(context);
@@ -468,11 +453,9 @@ void run_opencl_fo(HMM *word)
 	free(alpha);
 	free(alphasum);
 	free(lld);
-
 	free(at_alpha);
 
 	free(dummy);
-	free(tmpdata);
 
 	return;
 }

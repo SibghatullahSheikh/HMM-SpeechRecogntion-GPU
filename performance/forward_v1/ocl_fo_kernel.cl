@@ -109,12 +109,15 @@ __kernel void init_alpha(
 	size_t gid = get_global_id(0);
 	size_t lid = get_local_id(0);
 
-	if(gid < N){
-		lds[lid] =  alpha[gid] = B[gid] * prior[gid];
-		//printf("(%d) %.4e\n",gid,  alpha[gid]);
-	}else{
-		lds[lid] = 0.f;
-	}
+
+//	if(gid < N){
+//		lds[lid] =  alpha[gid] = B[gid] * prior[gid];
+//		//printf("(%d) %.4e\n",gid,  alpha[gid]);
+//	}else{
+//		lds[lid] = 0.f;
+//	}
+
+	lds[lid] =  alpha[gid] = B[gid] * prior[gid];
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
