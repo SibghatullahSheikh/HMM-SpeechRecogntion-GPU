@@ -1,0 +1,252 @@
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.070139 (s)
+
+=>CPU
+cpuTime = 0.023533 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.051945 (s)
+
+=>CPU
+cpuTime = 0.024863 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.101559 (s)
+
+=>CPU
+cpuTime = 0.025469 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.057120 (s)
+
+=>CPU
+cpuTime = 0.026380 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.059487 (s)
+
+=>CPU
+cpuTime = 0.025859 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.057750 (s)
+
+=>CPU
+cpuTime = 0.023969 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.083302 (s)
+
+=>CPU
+cpuTime = 0.024720 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.074662 (s)
+
+=>CPU
+cpuTime = 0.025702 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.060504 (s)
+
+=>CPU
+cpuTime = 0.026099 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.091319 (s)
+
+=>CPU
+cpuTime = 0.024113 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.093104 (s)
+
+=>CPU
+cpuTime = 0.022056 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.070157 (s)
+
+=>CPU
+cpuTime = 0.025764 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.064700 (s)
+
+=>CPU
+cpuTime = 0.025235 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.101529 (s)
+
+=>CPU
+cpuTime = 0.025442 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.056349 (s)
+
+=>CPU
+cpuTime = 0.025162 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.073138 (s)
+
+=>CPU
+cpuTime = 0.023428 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.053900 (s)
+
+=>CPU
+cpuTime = 0.026239 (s)
+log_likelihood = 2180.719674
+rm -rf c_fo ocl_fo run_opencl_fo ../../utils/ocl_utils.o ./result  *.o
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c ../../utils/ocl_utils.c -o ../../utils/ocl_utils.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  -c run_opencl_fo.c -o run_opencl_fo.o -lOpenCL  -lm -lrt
+gcc -g  -Wall -O3   -I/opt/AMDAPP/include -L/opt/AMDAPP/lib/x86_64  ocl_fo.c -o ocl_fo  ../../utils/ocl_utils.o run_opencl_fo.o -lOpenCL  -lm -lrt
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+lld = 2180.7205
+oclTime = 0.090024 (s)
+
+=>CPU
+cpuTime = 0.025670 (s)
+log_likelihood = 2180.719674
