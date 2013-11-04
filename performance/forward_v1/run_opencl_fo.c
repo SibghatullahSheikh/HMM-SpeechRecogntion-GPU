@@ -37,7 +37,7 @@ void run_opencl_fo(HMM *word)
 	// initialize for checking
 	float *alpha;
 	alpha = (float*)malloc(sizeof(float)*T*N); // T x B
-	init_2d_f(alpha,T,N,0.f);
+	//init_2d_f(alpha,T,N,0.f);
 
 
 	int blks = (N+255)/256;
@@ -46,7 +46,7 @@ void run_opencl_fo(HMM *word)
 
 	float *alphasum; // T x 1
 	alphasum = (float*)malloc(sizeof(float)*T);
-	init_1d_f(alphasum,T,0.f);
+	//init_1d_f(alphasum,T,0.f);
 
 	float *tmpdata; // T x 1
 	tmpdata = (float*)malloc(sizeof(float)*N);
@@ -191,11 +191,11 @@ void run_opencl_fo(HMM *word)
 	err = clEnqueueWriteBuffer(queue, B_d, 		CL_TRUE, 	0, sizeof(float)*T*N, 	B, 		0, NULL, NULL); 
 	OCL_CHECK(err);
 
-	err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*T*N, 	alpha, 	0, NULL, NULL); 
-	OCL_CHECK(err);
+//	err = clEnqueueWriteBuffer(queue, alpha_d, 	CL_TRUE, 	0, sizeof(float)*T*N, 	alpha, 	0, NULL, NULL); 
+//	OCL_CHECK(err);
 
-	err = clEnqueueWriteBuffer(queue, alphasum_d, CL_TRUE, 	0, sizeof(float)*T, 	alphasum, 0, NULL, NULL);  
-	OCL_CHECK(err);
+//	err = clEnqueueWriteBuffer(queue, alphasum_d, CL_TRUE, 	0, sizeof(float)*T, 	alphasum, 0, NULL, NULL);  
+//	OCL_CHECK(err);
 
 	err = clEnqueueWriteBuffer(queue, lld_d, CL_TRUE, 	0, sizeof(float), 	lld, 0, NULL, NULL);  
 	OCL_CHECK(err);

@@ -99,6 +99,7 @@ __kernel void init_alpha(
 		__global float *B, // use no contant memory for general purpose
 		__global float *prior,
 		__global float *alpha,
+		__global float *lld,
 		__local volatile float *lds,
 		const int blks)
 {
@@ -118,6 +119,9 @@ __kernel void init_alpha(
 		gid = i*256 + lid;	
 		data = B[gid] * prior[gid];
 		alpha[gid] = data;
+
+		//printf("(%d) %.4e\n",gid,  alpha[gid]);
+
 		lds[lid] += data;
 	}
 
@@ -135,16 +139,20 @@ __kernel void init_alpha(
 
 	if(lid == 0){
 		//alphasum[0] = lds[0];
+		//data = lds[0]; 
+
 		//printf("(%d) %.4e\n",lid,  lds[0]);
-		data = lds[0];
+		lld[0] += log(lds[0]);
 	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// normalise
 	#pragma unroll
 	for(i=0; i<blks; ++i)
 	{
 		gid = i*256 + lid;	
-		alpha[gid] /= data;
+		alpha[gid] /= lds[0];
 	}
 
 }
@@ -202,6 +210,7 @@ __kernel void alpha_dev(
 		__global float *B, // use no contant memory for general purpose
 		__global float *at_alpha,
 		__global float *alpha,
+		__global float *lld,
 		__local volatile float *lds,
 		const int N,
 		const int blks,
@@ -209,6 +218,8 @@ __kernel void alpha_dev(
 {
 	// lds[256]
 	size_t lid = get_local_id(0);
+	size_t gid;
+
 	float data;
 	lds[lid] = 0.f;
 
@@ -217,7 +228,7 @@ __kernel void alpha_dev(
 	for(i=0; i<blks; ++i)
 	{
 		gid = i * 256 + lid;
-		data = B[gid] * at_alpha[gid];
+		data = B[startPos + gid] * at_alpha[gid];
 		alpha[startPos + gid] = data;
 		lds[lid] += data;
 	}
@@ -236,15 +247,18 @@ __kernel void alpha_dev(
 
 	if(lid == 0){
 		//alphasum_tmp[get_group_id(0)] = lds[0];
-		data = lds[0];
+		//data = lds[0];
+		lld[0] += log(lds[0]);
 	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// normalise
 	#pragma unroll
 	for(i=0; i<blks; ++i)
 	{
 		gid = i*256 + lid;	
-		alpha[startPos + gid] /= data;
+		alpha[startPos + gid] /= lds[0];
 	}
 
 }
