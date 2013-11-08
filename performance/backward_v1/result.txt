@@ -1,0 +1,232 @@
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.048409 (s)
+
+=>CPU
+cpuTime = 0.015369 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.048989 (s)
+
+=>CPU
+cpuTime = 0.015388 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.057985 (s)
+
+=>CPU
+cpuTime = 0.015379 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.049142 (s)
+
+=>CPU
+cpuTime = 0.015371 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.050307 (s)
+
+=>CPU
+cpuTime = 0.015389 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.055489 (s)
+
+=>CPU
+cpuTime = 0.017662 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.048437 (s)
+
+=>CPU
+cpuTime = 0.015406 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.053274 (s)
+
+=>CPU
+cpuTime = 0.017583 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.047375 (s)
+
+=>CPU
+cpuTime = 0.015423 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.054980 (s)
+
+=>CPU
+cpuTime = 0.015447 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.049610 (s)
+
+=>CPU
+cpuTime = 0.015354 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.053553 (s)
+
+=>CPU
+cpuTime = 0.015378 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.047667 (s)
+
+=>CPU
+cpuTime = 0.015338 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.055003 (s)
+
+=>CPU
+cpuTime = 0.017770 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.049626 (s)
+
+=>CPU
+cpuTime = 0.017624 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.054363 (s)
+
+=>CPU
+cpuTime = 0.015402 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.059882 (s)
+
+=>CPU
+cpuTime = 0.017537 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.055665 (s)
+
+=>CPU
+cpuTime = 0.015376 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.048335 (s)
+
+=>CPU
+cpuTime = 0.017585 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.051292 (s)
+
+=>CPU
+cpuTime = 0.015372 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.050582 (s)
+
+=>CPU
+cpuTime = 0.015399 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.052651 (s)
+
+=>CPU
+cpuTime = 0.015345 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.050765 (s)
+
+=>CPU
+cpuTime = 0.015379 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.054205 (s)
+
+=>CPU
+cpuTime = 0.015390 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.051114 (s)
+
+=>CPU
+cpuTime = 0.017576 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.050201 (s)
+
+=>CPU
+cpuTime = 0.015448 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.045581 (s)
+
+=>CPU
+cpuTime = 0.017558 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.046531 (s)
+
+=>CPU
+cpuTime = 0.015357 (s)
+config_256N_256M
+Read the following files...Done!
+
+=>GPU
+oclTime = 0.052723 (s)
+
+=>CPU
+cpuTime = 0.015547 (s)
