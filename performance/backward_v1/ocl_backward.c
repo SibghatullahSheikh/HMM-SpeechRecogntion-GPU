@@ -136,6 +136,7 @@ int main(int argc, char*argv[])
 	// CPU Version
 	//---------------------------
 
+
 	puts("\n=>CPU");
 
 	struct timeval cpu_timer;

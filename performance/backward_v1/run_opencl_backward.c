@@ -47,7 +47,7 @@ void run_opencl_backward(HMM *word)
 	cl_command_queue queue;           // command queue
 	cl_program program;               // program
 
-	int numK = 3;
+	int numK = 4;
 	int numE = 2;
 
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*numK);
@@ -103,11 +103,15 @@ void run_opencl_backward(HMM *word)
 
 	kernel[0] = clCreateKernel(program, "mat_vec", &err);
 	OCL_CHECK(err);
+
 	kernel[1] = clCreateKernel(program, "scale_beta", &err);
 	OCL_CHECK(err);
+
 	kernel[2] = clCreateKernel(program, "beta_dev", &err);
 	OCL_CHECK(err);
 
+	kernel[3] = clCreateKernel(program, "normalize_beta", &err);
+	OCL_CHECK(err);
 
 
 	// allocate memory on device 
@@ -220,9 +224,35 @@ void run_opencl_backward(HMM *word)
 	 if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
 
+	//----------------------------------------------  normalize beta----------------------------------------//
+	 size_t local_3;
+	 size_t global_3;
+	 local_3  =  256;
+	 global_3 =  256;
+
+	 err  = clSetKernelArg(kernel[3], 0, sizeof(cl_mem), &beta_d);
+	 if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	 //err = clSetKernelArg(kernel[3], 1, sizeof(uint), &startPos);
+	 //if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	 //err = clSetKernelArg(kernel[3], 2, sizeof(uint), &startPos_pre);
+	 //if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	 err = clSetKernelArg(kernel[3], 3, sizeof(float)*257, NULL);
+	 if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	 err = clSetKernelArg(kernel[3], 4, sizeof(int), &N);
+	 if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	 err = clSetKernelArg(kernel[3], 5, sizeof(int), &blks);
+	 if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+
 	// time capsule
 	int frame;
 
+	//for(frame = (T-3) ; frame >= (T-3); frame--)
 	for(frame = (T-3) ; frame >= 0; frame--)
 	{
 		startPos =  frame * N;
@@ -237,14 +267,14 @@ void run_opencl_backward(HMM *word)
 		err = clEnqueueNDRangeKernel(queue, kernel[2], 2, NULL, global_2, local_2, 0, NULL, NULL );
 		OCL_CHECK(err);
 
-		// scaling
-		err = clSetKernelArg(kernel[1], 1, sizeof(uint), &startPos);
+		// nomalize 
+		err = clSetKernelArg(kernel[3], 1, sizeof(uint), &startPos);
 		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-		err = clSetKernelArg(kernel[1], 2, sizeof(uint), &startPos_pre);
+		err = clSetKernelArg(kernel[3], 2, sizeof(uint), &startPos_pre);
 		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-		err = clEnqueueNDRangeKernel(queue, kernel[1], 1, NULL, &global_1, &local_1, 0, NULL, NULL );
+		err = clEnqueueNDRangeKernel(queue, kernel[3], 1, NULL, &global_3, &local_3, 0, NULL, NULL );
 		OCL_CHECK(err);
 
 	}
@@ -253,6 +283,11 @@ void run_opencl_backward(HMM *word)
 	clFinish(queue);
 
 	clEnqueueReadBuffer(queue, beta_d, CL_TRUE, 0, sizeof(float)*N*T, beta, 0, NULL , &event[1]);
+
+
+	//check 2d
+
+
 
 	err = clWaitForEvents(1,&event[1]);
 	OCL_CHECK(err);
@@ -269,8 +304,17 @@ void run_opencl_backward(HMM *word)
 
 	// check
 	//check_2d_f(beta,N,T);
-
-
+	/*
+	int j;
+	for(i = 0 ; i < T; ++i){
+		printf("row = %d\n", i);
+		for( j = 0 ; j < N; ++j) {
+			printf("%.4e\n",beta[i*N + j]);	
+		
+		}
+		printf("\n");
+	}
+*/
 
 	clReleaseMemObject(A_d);
 	clReleaseMemObject(B_d);

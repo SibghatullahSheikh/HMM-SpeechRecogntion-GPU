@@ -51,6 +51,7 @@ __kernel void mat_vec(
 	}
 }
 
+
 __kernel void scale_beta(
 		__global float *beta,
 		const uint startPos,
@@ -119,6 +120,66 @@ __kernel void scale_beta(
 
 
 
+
+__kernel void normalize_beta(
+		__global float *beta,
+		const uint startPos,
+		const uint startPos_pre,
+		__local volatile float *lds,
+		const int N,
+		const int blks)
+{
+	// 256 +  1 
+	size_t lid = get_local_id(0);
+	size_t gid;
+	float data;
+
+	int i;
+
+	lds[lid] = 0.f;
+
+	// work on T-2
+	// fetch data to lds
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;        
+		//data = B[gid] * prior[gid];
+		//printf("(%d) %.4e\n",gid,  alpha[gid]);
+		lds[lid] += beta[startPos + gid];
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	// reduction on 256 
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
+	if(lid <  32) {lds[lid] += lds[lid +  32];}
+	if(lid <  16) {lds[lid] += lds[lid +  16];}
+	if(lid <   8) {lds[lid] += lds[lid +   8];}
+	if(lid <   4) {lds[lid] += lds[lid +   4];}
+	if(lid <   2) {lds[lid] += lds[lid +   2];}
+	if(lid <   1) {lds[lid] += lds[lid +   1];}
+
+	if(lid == 0){
+		lds[256] = lds[0];
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	// normalise
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;        
+		beta[startPos + gid] /= lds[256];
+
+		//printf("(%d) %.4e\n",gid,  beta[startPos + gid]);
+	}
+
+}
+
+
 // beta_dev: combine A * (beta .* B)
 __kernel void beta_dev(
 	__global float *beta,  // no need to initialize
@@ -164,7 +225,7 @@ __kernel void beta_dev(
 							+ lds[start + 8]  + lds[start + 9] + lds[start + 10] + lds[start + 11] 
 							+ lds[start + 12] + lds[start + 13] + lds[start + 14] + lds[start + 15]; 
 
-		//printf("(%d) %.4e\n",gy,  out[gy]);
+		//printf("(%d) %.4e\n",gy,  beta[startPos + gy]);
 	}
 }
 
