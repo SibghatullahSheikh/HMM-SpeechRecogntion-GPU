@@ -1,9 +1,8 @@
 //#pragma OPENCL EXTENSION cl_amd_fp64 : enable
 //#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-//#pragma OPENCL EXTENSION cl_amd_printf : enable
+#pragma OPENCL EXTENSION cl_amd_printf : enable
 
-#define TILE 16
-
+//#define TILE 16
 
 // kernel 1 : vector mul 
 // beta x B, at t+1
@@ -19,17 +18,19 @@ __kernel void vector_mul(
 	size_t gid = get_global_id(0);
 	beta_B[gid] = beta[tPos + gid] * B[tPos + gid];
 	gamma_norm[gid] = alpha[tPos_pre + gid] * beta[tPos_pre + gid];	
+	//printf("(%d) %.4e\n", gid , gamma_norm[gid]);
 }
 
 
 
 
+
 // kernel 2 : 2d 
-__kernel void states_dev(
-	__global float *out,
+__kernel void state_dev(
+	__global float *beta_B,
 	__global float *alpha,
 	__global float *A,
-	__global float *xi_sum_norm,
+	__global float *xisum_norm,
 	const int N,
 	const uint tPos_pre)
 {
@@ -37,9 +38,94 @@ __kernel void states_dev(
 	size_t gx = get_global_id(0);
 	size_t gy = get_global_id(1);
 
-	xi_sum_norm[gy * N + gx] = alpha[tPos_pre + gy] * out[gx] * A[gy * N +  gx];
+	xisum_norm[gy * N + gx] = alpha[tPos_pre + gy] * beta_B[gx] * A[gy * N +  gx];
+	//printf("(%d,%d) %.4e\n",gy,gx, xisum_norm[gy*N + gx]);
+}
+
+
+// normalise on gamma_norm
+__kernel void normalise_1d_gamma(
+	__global float *gamma_norm,
+	__global float *gamma,
+	__local volatile float *lds,
+	const uint tPos_pre,
+	const int blks)
+{
+	// launch 256 tpb only, do reduction and then scaling
+
+	size_t lid = get_local_id(0);
+	size_t gid;
+
+	lds[lid] = 0.f;
+
+	// fetch data to lds
+	int i;
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;        
+	 	lds[lid] += gamma_norm[gid];
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	// reduction on 256 
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
+	if(lid <  32) {lds[lid] += lds[lid +  32];}
+	if(lid <  16) {lds[lid] += lds[lid +  16];}
+	if(lid <   8) {lds[lid] += lds[lid +   8];}
+	if(lid <   4) {lds[lid] += lds[lid +   4];}
+	if(lid <   2) {lds[lid] += lds[lid +   2];}
+	if(lid <   1) {lds[lid] += lds[lid +   1];}
+
+	// final sum is located in lds[0]
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	#pragma unroll
+	for(i=0; i<blks; ++i)
+	{
+		gid = i*256 + lid;        
+		float data;
+		gamma[tPos_pre + gid] = data = gamma_norm[gid] / lds[0];
+		//printf("(%d) %.4e\n",gid, data);
+	}
 
 }
+
+
+// normalise on xisum_norm 
+__kernel void normalise_xisum_s1(
+	__global float *xisum_norm,
+	__global float *xisum_mid,
+	__local volatile float *lds)
+{
+	// 16 x 16
+
+}
+
+/*
+
+// second stage: reduction on xisum_mid
+__kernel void normalise_xisum_s2(
+	__global float *xisum_mid,
+	__global float *xisum_fin)
+{
+
+
+}
+
+// third stage: simple scaling
+__kernel void normalise_xisum_s3(
+	__global float *xisum_norm,
+	__global float *xisum_fin)
+{
+
+
+
+}
+
+*/
 
 
 /*

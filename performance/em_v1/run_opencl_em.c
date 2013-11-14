@@ -33,18 +33,6 @@ void run_opencl_em(HMM *word)
 	// in order to increase the memory coalescing
 	// this will be avoided when we do data arrangement early
 
-/*
-	for(i=0;i<N;i++)
-	{
-		for(j=0;j<T;j++)
-		{
-			printf("beta[%d][%d] = %.4e ", i,j, beta[i*T+j]);
-		}
-		printf("\n");
-	}
-*/
-
-
 	float *B_h = (float*)malloc(sizeof(float)*T*N);
 	transpose(B,B_h,N,T);
 
@@ -54,16 +42,31 @@ void run_opencl_em(HMM *word)
 	float *beta_h = (float*)malloc(sizeof(float)*T*N);
 	transpose(beta,beta_h,N,T);
 
-
 	float *observations_h = (float*)malloc(sizeof(float)*T*D);
 	transpose(observations,observations_h,D,T);
 
-	uint tPos, tPos_pre;	
 
+	float *xisum = (float*)malloc(sizeof(float)*N*N);
+	memset(xisum,0,sizeof(float)*N*N);
+
+	/*
+	for(i=0;i<N;i++)
+	{
+		for(j=0;j<N;j++)
+		{
+			printf("%.4e", xisum[i*N+j]);
+		}
+		printf("\n");
+	}
+	*/
 	
 	float *tmp = (float*)malloc(sizeof(float)*N);
 
 
+
+	uint tPos, tPos_pre;	
+
+	int blks = (N+255)/256;
 
 	// gpu timer
 	cl_ulong gstart, gend;
@@ -140,6 +143,11 @@ void run_opencl_em(HMM *word)
 	kernel[0] = clCreateKernel(program, "vector_mul", &err);
 	OCL_CHECK(err);
 
+	kernel[1] = clCreateKernel(program, "state_dev", &err);
+	OCL_CHECK(err);
+
+	kernel[2] = clCreateKernel(program, "normalise_1d_gamma", &err);
+	OCL_CHECK(err);
 
 	// device data
 	cl_mem B_d
@@ -166,6 +174,9 @@ void run_opencl_em(HMM *word)
 	cl_mem gamma_norm_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,  NULL, NULL); // N 
 
+	cl_mem gamma_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL); // N 
+
 	cl_mem xisum_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL); // N 
 
@@ -189,6 +200,8 @@ void run_opencl_em(HMM *word)
 	err = clEnqueueWriteBuffer(queue, observations_d, 	CL_TRUE, 	0, sizeof(float)*D*T, 	observations_h,	0, NULL, NULL); 
 	OCL_CHECK(err);
 
+	err = clEnqueueWriteBuffer(queue, xisum_d, 	CL_TRUE, 	0, sizeof(float)*N*N, 	xisum,	0, NULL, NULL); 
+	OCL_CHECK(err);
 
 
 	//------------------------- E ---------------------------------// 
@@ -232,10 +245,58 @@ void run_opencl_em(HMM *word)
 	}
 */
 
-	err = clEnqueueFillBuffer(queue, kernel[0], 1, NULL, &g0, &l0, 0, NULL, NULL);
+	// kernel 2:
+	size_t l1[2];
+	size_t g1[2];
+	l1[0] = l1[1] =  16;
+	g1[0] = g1[1] =  N;
+
+	err = clSetKernelArg(kernel[1], 0, sizeof(cl_mem), &beta_B_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[1], 1, sizeof(cl_mem), &alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[1], 2, sizeof(cl_mem), &A_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[1], 3, sizeof(cl_mem), &xisum_norm_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[1], 4, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[1], 5, sizeof(uint), &tPos_pre);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[1], 2, NULL, g1, l1, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+	// kernel 3: normalize to produce gamma
+	size_t l2 = 256;
+	size_t g2 = 256;
+
+	err = clSetKernelArg(kernel[2], 0, sizeof(cl_mem), &gamma_norm_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[2], 1, sizeof(cl_mem), &gamma_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[2], 2, sizeof(float)*256, NULL);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[2], 3, sizeof(uint), &tPos_pre);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[2], 4, sizeof(int), &blks);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &g2, &l2, 0, NULL, NULL);
 	OCL_CHECK(err);
 
 
+	// kernel 4: normalise to produce xisum
+	
 
 	//----------------------------- M --------------------------------------// 
 
@@ -703,6 +764,7 @@ void run_opencl_em(HMM *word)
 	clReleaseMemObject(observations_d);
 	clReleaseMemObject(observations_t_d);
 	clReleaseMemObject(gamma_norm_d);
+	clReleaseMemObject(gamma_d);
 
 	clReleaseMemObject(xisum_norm_d);
 	clReleaseMemObject(xisum_d);
@@ -725,7 +787,7 @@ void run_opencl_em(HMM *word)
 	free(observations_h);
 	free(kernelSource);
 
-
+	free(xisum);
 	free(tmp);
 
 	return;
