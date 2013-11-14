@@ -9,20 +9,21 @@
 // beta x B, at t+1
 __kernel void vector_mul(
 	__global float *beta,
+	__global float *alpha,
 	__global float *B,
-	__global float *out,
+	__global float *beta_B,
 	__global float *gamma_norm,
 	const uint tPos,
 	const uint tPos_pre)
 {
 	size_t gid = get_global_id(0);
-	out[gid] = beta[tPos + gid] * B[tPos + gid];
-
+	beta_B[gid] = beta[tPos + gid] * B[tPos + gid];
 	gamma_norm[gid] = alpha[tPos_pre + gid] * beta[tPos_pre + gid];	
-
 }
 
 
+
+/*
 // kernel 2 : 2d 
 __kernel void states_dev(
 	__global float *out,
@@ -97,12 +98,9 @@ __kernel void normalise(
 		//printf("(%d) %.4e\n",gid,  beta[startPos + gid]);
 	}
 
-
-
-
-
-
 }
+
+*/
 
 
 // kernel4 : normalise gamma_sum 
@@ -216,22 +214,6 @@ __kernel void gammaob_ob_t_dev (
 		const int T,
 		const int k)
 {
-/*
-	size_t gx = get_global_id(0); // i
-	size_t gy = get_global_id(1); // j
-	int n;
-
-	if( gx < D && gy < D )
-	{
-		double tmp = 0.0;
-		for(n = 0; n < T; ++n) {
-			tmp += gamma_obs[gx * T + n] * observations_t[ n * D + gy];
-		}
-
-		gammaob_ob_t[gx * D + gy] = (float)tmp / gamma_state_sum[k];
-
-	}
-*/
 	// gamma_obs		[Row][m*TILE+ty]
 	// observations_t 	[m*TILE+tx][Col] 
 	int gx = get_global_id(0); 
