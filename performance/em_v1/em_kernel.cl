@@ -23,7 +23,7 @@ __kernel void vector_mul(
 
 
 
-/*
+
 // kernel 2 : 2d 
 __kernel void states_dev(
 	__global float *out,
@@ -41,6 +41,8 @@ __kernel void states_dev(
 
 }
 
+
+/*
 
 // kernel3 : normalise xi_sum
 __kernel void normalise(

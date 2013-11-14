@@ -47,38 +47,31 @@ int main(int argc, char*argv[])
 		"resources/config_32N32M_alpha.txt",
 		"resources/config_32N32M_beta.txt",
 		"resources/config_32N32M_obs.txt",
-
 		"resources/config_64N64M_B.txt",
 		"resources/config_64N64M_A.txt",
 		"resources/config_64N64M_alpha.txt",
 		"resources/config_64N64M_beta.txt",
 		"resources/config_64N64M_obs.txt",
-
 		"resources/config_128N128M_B.txt",
 		"resources/config_128N128M_A.txt",
 		"resources/config_128N128M_alpha.txt",
 		"resources/config_128N128M_beta.txt",
 		"resources/config_128N128M_obs.txt",
-
 		"resources/config_256N256M_B.txt",
 		"resources/config_256N256M_A.txt",
 		"resources/config_256N256M_alpha.txt",
 		"resources/config_256N256M_beta.txt",
 		"resources/config_256N256M_obs.txt",
-
 		"resources/config_512N512M_B.txt",
 		"resources/config_512N512M_A.txt",
 		"resources/config_512N512M_alpha.txt",
 		"resources/config_512N512M_beta.txt",
 		"resources/config_512N512M_obs.txt",
-
-
 		"resources/config_1024N1024M_B.txt",
 		"resources/config_1024N1024M_A.txt",
 		"resources/config_1024N1024M_alpha.txt",
 		"resources/config_1024N1024M_beta.txt",
 		"resources/config_1024N1024M_obs.txt",
-
 	};
 
 
@@ -172,7 +165,7 @@ int main(int argc, char*argv[])
 	//------------------------------------------------
 
 	puts("\n=>CPU");
-
+/*
 	struct timeval cpu_timer;
 
 	int N = word->nstates;
@@ -476,10 +469,6 @@ int main(int argc, char*argv[])
 //	}
 //	printf("\n");
 
-
-	// free memory
-	free_hmm(word);
-
 	free(xi_sum);
 	free(gamma);
 	free(beta_B);
@@ -499,6 +488,10 @@ int main(int argc, char*argv[])
 	free(gamma_obs_mul);
 	free(exp_mu_mul);
 	free(gammaob_ob_t);
+*/
+
+	// free memory
+	free_hmm(word);
 
 	return 0;
 }

@@ -35,23 +35,23 @@ void read_config(HMM* word, char **files,int job, int states, int len, int featu
 
 	for(i = 0; i < 5; ++i){
 		if(i == 0){
-			read_b(files[job*4],word,N,T);
+			read_b(files[job*5],word,N,T);
 		}
 
 		if(i == 1){
-			read_a(files[job*4+1],word,N,N);
+			read_a(files[job*5+1],word,N,N);
 		}
 
 		if(i == 2){
-			read_alpha(files[job*4+2],word,N,T);
+			read_alpha(files[job*5+2],word,N,T);
 		}
 
 		if(i == 3){
-			read_beta(files[job*4+3],word,N,T);
+			read_beta(files[job*5+3],word,N,T);
 		}
 		
 		if(i == 4){
-			read_obs(files[job*4+4],word,D,T);
+			read_obs(files[job*5+4],word,D,T);
 		}
 	}
 

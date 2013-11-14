@@ -23,6 +23,7 @@ void run_opencl_em(HMM *word)
 	int D = word->features;
 
 	float *B = word->b; // N x T
+
 	float *A = word->a; // N x N
 	float *alpha = word->alpha; // N x T
 	float *beta  = word->beta;  // N x T
@@ -31,6 +32,17 @@ void run_opencl_em(HMM *word)
 	// we need to transpose the B/alpha/beta/observations
 	// in order to increase the memory coalescing
 	// this will be avoided when we do data arrangement early
+
+/*
+	for(i=0;i<N;i++)
+	{
+		for(j=0;j<T;j++)
+		{
+			printf("beta[%d][%d] = %.4e ", i,j, beta[i*T+j]);
+		}
+		printf("\n");
+	}
+*/
 
 
 	float *B_h = (float*)malloc(sizeof(float)*T*N);
@@ -42,10 +54,16 @@ void run_opencl_em(HMM *word)
 	float *beta_h = (float*)malloc(sizeof(float)*T*N);
 	transpose(beta,beta_h,N,T);
 
+
 	float *observations_h = (float*)malloc(sizeof(float)*T*D);
 	transpose(observations,observations_h,D,T);
 
 	uint tPos, tPos_pre;	
+
+	
+	float *tmp = (float*)malloc(sizeof(float)*N);
+
+
 
 	// gpu timer
 	cl_ulong gstart, gend;
@@ -148,7 +166,11 @@ void run_opencl_em(HMM *word)
 	cl_mem gamma_norm_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,  NULL, NULL); // N 
 
+	cl_mem xisum_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL); // N 
 
+	cl_mem xisum_norm_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL); // N 
 
 
 	// copy from host to device
@@ -202,10 +224,16 @@ void run_opencl_em(HMM *word)
 	err = clEnqueueNDRangeKernel(queue, kernel[0], 1, NULL, &g0, &l0, 0, NULL, NULL);
 	OCL_CHECK(err);
 
+/*
+	clFinish(queue);
+	clEnqueueReadBuffer(queue, beta_B_d, CL_TRUE, 0, sizeof(float)*N, tmp, 0, NULL , NULL);
+	for(i=0; i<N; ++i){
+		printf("tmp%d = %.4e\n",i,tmp[i]);
+	}
+*/
 
-
-
-
+	err = clEnqueueFillBuffer(queue, kernel[0], 1, NULL, &g0, &l0, 0, NULL, NULL);
+	OCL_CHECK(err);
 
 
 
@@ -676,6 +704,10 @@ void run_opencl_em(HMM *word)
 	clReleaseMemObject(observations_t_d);
 	clReleaseMemObject(gamma_norm_d);
 
+	clReleaseMemObject(xisum_norm_d);
+	clReleaseMemObject(xisum_d);
+
+
 	clReleaseProgram(program);
 	clReleaseContext(context);
 	clReleaseCommandQueue(queue);
@@ -692,6 +724,9 @@ void run_opencl_em(HMM *word)
 	free(beta_h);
 	free(observations_h);
 	free(kernelSource);
+
+
+	free(tmp);
 
 	return;
 }
