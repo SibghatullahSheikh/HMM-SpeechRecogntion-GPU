@@ -60,13 +60,18 @@ void run_opencl_em(HMM *word)
 	}
 	*/
 	
-	float *tmp = (float*)malloc(sizeof(float)*N);
+	//float *tmp = (float*)malloc(sizeof(float)*N);
 
 
 
 	uint tPos, tPos_pre;	
 
 	int blks = (N+255)/256;
+
+	int bx = (N+15)/16;
+	int by = (N+15)/16;
+	int bxy = bx * by; // xisum_mid
+
 
 	// gpu timer
 	cl_ulong gstart, gend;
@@ -83,8 +88,8 @@ void run_opencl_em(HMM *word)
 
 	cl_int err;
 
-	int numK = 6;
-	int numE = 2;
+	int numK = 7;
+	int numE = 1;
 
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*numK);
 
@@ -108,7 +113,6 @@ void run_opencl_em(HMM *word)
 	result = fread(kernelSource,1,size,fh);
 	if(result != size){ fputs("Reading error", stderr);exit(1);}
 	kernelSource[size] = '\0';
-
 
 	// Bind to platform
 	err = clGetPlatformIDs(1, &platform, NULL);
@@ -149,6 +153,18 @@ void run_opencl_em(HMM *word)
 	kernel[2] = clCreateKernel(program, "normalise_1d_gamma", &err);
 	OCL_CHECK(err);
 
+	kernel[3] = clCreateKernel(program, "normalise_xisum_s1", &err);
+	OCL_CHECK(err);
+
+	kernel[4] = clCreateKernel(program, "normalise_xisum_s2", &err);
+	OCL_CHECK(err);
+
+	kernel[5] = clCreateKernel(program, "normalise_xisum_s3", &err);
+	OCL_CHECK(err);
+
+	kernel[6] = clCreateKernel(program, "xisum_addon", &err);
+	OCL_CHECK(err);
+
 	// device data
 	cl_mem B_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
@@ -182,6 +198,12 @@ void run_opencl_em(HMM *word)
 
 	cl_mem xisum_norm_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL); // N 
+
+	cl_mem xisum_mid_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*bxy,  NULL, NULL); // bxy 
+
+	cl_mem xisum_fin_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float),  NULL, NULL); //  1 
 
 
 	// copy from host to device
@@ -296,7 +318,90 @@ void run_opencl_em(HMM *word)
 
 
 	// kernel 4: normalise to produce xisum
+	// xisum_norm_d is NxN
+	// step 1
+	size_t l3[2];
+	size_t g3[2];
+	l3[0] = l3[1] =  16;
+	g3[0] = g3[1] =  N;
+
+	err = clSetKernelArg(kernel[3], 0, sizeof(cl_mem), &xisum_norm_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 	
+	err = clSetKernelArg(kernel[3], 1, sizeof(cl_mem), &xisum_mid_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[3], 2, sizeof(float)*256, NULL);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[3], 3, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[3], 2, NULL, g3, l3, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+
+	// kernel 5: step 2
+	// user 256 as tpb
+	size_t l4 = 256;
+	size_t g4 = 256; // bxy should be multiples of 256 
+	uint iters = (bxy+255)/256;
+
+	err = clSetKernelArg(kernel[4], 0, sizeof(cl_mem), &xisum_mid_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+	
+	err = clSetKernelArg(kernel[4], 1, sizeof(cl_mem), &xisum_fin_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[4], 2, sizeof(float)*256, NULL);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[4], 3, sizeof(uint), &iters);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[4], 1, NULL, &g4, &l4, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+	// kernel 6: step 3
+	size_t l5[2];
+	size_t g5[2];
+	l5[0] = l5[1] =  16;
+	g5[0] = g5[1] =  N;
+
+	err = clSetKernelArg(kernel[5], 0, sizeof(cl_mem), &xisum_norm_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[5], 1, sizeof(cl_mem), &xisum_fin_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[5], 2, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[5], 2, NULL, g5, l5, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+
+	// kernel 7: xisum addon
+	size_t l6[2];
+	size_t g6[2];
+	l6[0] = l6[1] =  16;
+	g6[0] = g6[1] =  N;
+
+	err = clSetKernelArg(kernel[6], 0, sizeof(cl_mem), &xisum_norm_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[6], 1, sizeof(cl_mem), &xisum_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[6], 2, sizeof(int), &N);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[6], 2, NULL, g6, l6, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+
+
+
 
 	//----------------------------- M --------------------------------------// 
 
@@ -756,30 +861,39 @@ void run_opencl_em(HMM *word)
 	free(dummy);
 */
 
-	clReleaseMemObject(beta_d);
-	clReleaseMemObject(beta_B_d);
-	clReleaseMemObject(alpha_d);
+
+
 	clReleaseMemObject(B_d);
-	clReleaseMemObject(A_d);
+	clReleaseMemObject(alpha_d);
+	clReleaseMemObject(beta_d);
 	clReleaseMemObject(observations_d);
 	clReleaseMemObject(observations_t_d);
+	clReleaseMemObject(A_d);
+	clReleaseMemObject(beta_B_d);
 	clReleaseMemObject(gamma_norm_d);
 	clReleaseMemObject(gamma_d);
 
-	clReleaseMemObject(xisum_norm_d);
 	clReleaseMemObject(xisum_d);
+	clReleaseMemObject(xisum_norm_d);
+	clReleaseMemObject(xisum_mid_d);
+	clReleaseMemObject(xisum_fin_d);
 
 
 	clReleaseProgram(program);
 	clReleaseContext(context);
 	clReleaseCommandQueue(queue);
 
+
 	for(i=0;i<numK;++i){
-		clReleaseKernel(kernel[i]);
+		err = clReleaseKernel(kernel[i]);
+		OCL_CHECK(err);
 	}
-	for(i=0;i<numE;++i){
-		clReleaseEvent(event[i]);
+
+	for(j=0;j<numE;++j){
+		err = clReleaseEvent(event[j]);
+		OCL_CHECK(err);
 	}
+
 
 	free(B_h);
 	free(alpha_h);
@@ -788,7 +902,7 @@ void run_opencl_em(HMM *word)
 	free(kernelSource);
 
 	free(xisum);
-	free(tmp);
+	//free(tmp);
 
 	return;
 }

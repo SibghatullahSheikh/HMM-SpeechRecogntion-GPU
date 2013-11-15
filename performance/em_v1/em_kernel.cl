@@ -2,7 +2,7 @@
 //#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #pragma OPENCL EXTENSION cl_amd_printf : enable
 
-//#define TILE 16
+#define TILE 16
 
 // kernel 1 : vector mul 
 // beta x B, at t+1
@@ -52,7 +52,6 @@ __kernel void normalise_1d_gamma(
 	const int blks)
 {
 	// launch 256 tpb only, do reduction and then scaling
-
 	size_t lid = get_local_id(0);
 	size_t gid;
 
@@ -86,8 +85,10 @@ __kernel void normalise_1d_gamma(
 	for(i=0; i<blks; ++i)
 	{
 		gid = i*256 + lid;        
-		float data;
-		gamma[tPos_pre + gid] = data = gamma_norm[gid] / lds[0];
+		gamma[tPos_pre + gid] = gamma_norm[gid] / lds[0];
+
+		//float data;
+		//gamma[tPos_pre + gid] = data = gamma_norm[gid] / lds[0];
 		//printf("(%d) %.4e\n",gid, data);
 	}
 
@@ -98,34 +99,117 @@ __kernel void normalise_1d_gamma(
 __kernel void normalise_xisum_s1(
 	__global float *xisum_norm,
 	__global float *xisum_mid,
-	__local volatile float *lds)
+	__local volatile float *lds,
+	const int N)
 {
 	// 16 x 16
+	size_t gx = get_global_id(0); // col
+	size_t gy = get_global_id(1); // row
 
+	size_t lx = get_local_id(0); // col
+	size_t ly = get_local_id(1); // row
+
+	size_t bx = get_group_id(0);
+	size_t by = get_group_id(1);
+
+	size_t lid = ly * TILE + lx;
+
+	size_t m = get_num_groups(0);
+
+	lds[lid] = xisum_norm[gy * N + gx];
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
+	if(lid <  32) {lds[lid] += lds[lid +  32];}
+	if(lid <  16) {lds[lid] += lds[lid +  16];}
+	if(lid <   8) {lds[lid] += lds[lid +   8];}
+	if(lid <   4) {lds[lid] += lds[lid +   4];}
+	if(lid <   2) {lds[lid] += lds[lid +   2];}
+	if(lid <   1) {lds[lid] += lds[lid +   1];}
+
+	if(lid == 0) {		
+		xisum_mid[by * m + bx] = lds[0];
+	}
 }
 
-/*
+
 
 // second stage: reduction on xisum_mid
 __kernel void normalise_xisum_s2(
 	__global float *xisum_mid,
-	__global float *xisum_fin)
+	__global float *xisum_fin,
+	__local volatile float *lds,
+	const uint iters)
 {
+	// reduce to one final sum
+	size_t lid = get_local_id(0);
+	size_t gid;
+	int i;
 
+	lds[lid] = 0.f;
 
+	// fetch data to lds
+	#pragma unroll
+	for(i=0; i<iters; ++i)
+	{
+		gid = i*256 + lid;        
+	 	lds[lid] += xisum_mid[gid];
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	// reduction on 256 
+	if(lid < 128) {lds[lid] += lds[lid + 128];}
+	if(lid <  64) {lds[lid] += lds[lid +  64];}
+	if(lid <  32) {lds[lid] += lds[lid +  32];}
+	if(lid <  16) {lds[lid] += lds[lid +  16];}
+	if(lid <   8) {lds[lid] += lds[lid +   8];}
+	if(lid <   4) {lds[lid] += lds[lid +   4];}
+	if(lid <   2) {lds[lid] += lds[lid +   2];}
+	if(lid <   1) {lds[lid] += lds[lid +   1];}
+
+	// final sum is located in lds[0]
+	if(lid == 0)
+	{
+		xisum_fin[0] = lds[0];
+		//printf("sum = %.4e\n", lds[0]);
+	}
 }
+
+
 
 // third stage: simple scaling
 __kernel void normalise_xisum_s3(
 	__global float *xisum_norm,
-	__global float *xisum_fin)
+	__global float *xisum_fin,
+	const int N)
 {
+	// NxN 
+	size_t gx = get_global_id(0);  // col
+	size_t gy = get_global_id(1);  // row
 
-
-
+	xisum_norm[gy * N + gx] /= xisum_fin[0];
+	//printf("(%d,%d) %.4e\n",gy,gx, xisum_norm[gy * N + gx]);
 }
 
-*/
+
+// kernel 7:  add xisum_norm  to xisum 
+__kernel void xisum_addon(
+	__global float *xisum_norm,
+	__global float *xisum,
+	const int N)
+{
+	size_t gx = get_global_id(0);  // col
+	size_t gy = get_global_id(1);  // row
+
+	size_t gid = gy * N + gx;
+
+	xisum[gid] += xisum_norm[gid];
+}
+
+
 
 
 /*
