@@ -45,23 +45,12 @@ void run_opencl_em(HMM *word)
 	float *observations_h = (float*)malloc(sizeof(float)*T*D);
 	transpose(observations,observations_h,D,T);
 
-
 	float *xisum = (float*)malloc(sizeof(float)*N*N);
 	memset(xisum,0,sizeof(float)*N*N);
 
-	/*
-	for(i=0;i<N;i++)
-	{
-		for(j=0;j<N;j++)
-		{
-			printf("%.4e", xisum[i*N+j]);
-		}
-		printf("\n");
-	}
-	*/
-	
-	//float *tmp = (float*)malloc(sizeof(float)*N);
-
+#ifdef DEBUG
+	float *gamma_h = (float*)malloc(sizeof(float)*T*N); // T x N
+#endif
 
 
 	uint tPos, tPos_pre;	
@@ -88,7 +77,7 @@ void run_opencl_em(HMM *word)
 
 	cl_int err;
 
-	int numK = 7;
+	int numK = 8;
 	int numE = 1;
 
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*numK);
@@ -165,6 +154,11 @@ void run_opencl_em(HMM *word)
 	kernel[6] = clCreateKernel(program, "xisum_addon", &err);
 	OCL_CHECK(err);
 
+	kernel[7] = clCreateKernel(program, "gammaT", &err);
+	OCL_CHECK(err);
+
+
+
 	// device data
 	cl_mem B_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
@@ -227,10 +221,6 @@ void run_opencl_em(HMM *word)
 
 
 	//------------------------- E ---------------------------------// 
-	tPos = N;
-	tPos_pre = tPos - N;
-
-
 	// kernel 1 : beta x B
 	size_t l0 = 256;
 	size_t g0 = N ;
@@ -250,22 +240,6 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[0], 4, sizeof(cl_mem), &gamma_norm_d);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clSetKernelArg(kernel[0], 5, sizeof(uint), &tPos);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err = clSetKernelArg(kernel[0], 6, sizeof(uint), &tPos_pre);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err = clEnqueueNDRangeKernel(queue, kernel[0], 1, NULL, &g0, &l0, 0, NULL, NULL);
-	OCL_CHECK(err);
-
-/*
-	clFinish(queue);
-	clEnqueueReadBuffer(queue, beta_B_d, CL_TRUE, 0, sizeof(float)*N, tmp, 0, NULL , NULL);
-	for(i=0; i<N; ++i){
-		printf("tmp%d = %.4e\n",i,tmp[i]);
-	}
-*/
 
 	// kernel 2:
 	size_t l1[2];
@@ -288,11 +262,6 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[1], 4, sizeof(int), &N);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clSetKernelArg(kernel[1], 5, sizeof(uint), &tPos_pre);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err = clEnqueueNDRangeKernel(queue, kernel[1], 2, NULL, g1, l1, 0, NULL, NULL);
-	OCL_CHECK(err);
 
 	// kernel 3: normalize to produce gamma
 	size_t l2 = 256;
@@ -307,14 +276,8 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[2], 2, sizeof(float)*256, NULL);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clSetKernelArg(kernel[2], 3, sizeof(uint), &tPos_pre);
+	err = clSetKernelArg(kernel[2], 3, sizeof(int), &blks);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err = clSetKernelArg(kernel[2], 4, sizeof(int), &blks);
-	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-
-	err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &g2, &l2, 0, NULL, NULL);
-	OCL_CHECK(err);
 
 
 	// kernel 4: normalise to produce xisum
@@ -337,8 +300,6 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[3], 3, sizeof(int), &N);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clEnqueueNDRangeKernel(queue, kernel[3], 2, NULL, g3, l3, 0, NULL, NULL);
-	OCL_CHECK(err);
 
 
 	// kernel 5: step 2
@@ -359,8 +320,6 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[4], 3, sizeof(uint), &iters);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clEnqueueNDRangeKernel(queue, kernel[4], 1, NULL, &g4, &l4, 0, NULL, NULL);
-	OCL_CHECK(err);
 
 	// kernel 6: step 3
 	size_t l5[2];
@@ -377,8 +336,6 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[5], 2, sizeof(int), &N);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clEnqueueNDRangeKernel(queue, kernel[5], 2, NULL, g5, l5, 0, NULL, NULL);
-	OCL_CHECK(err);
 
 
 	// kernel 7: xisum addon
@@ -396,12 +353,96 @@ void run_opencl_em(HMM *word)
 	err = clSetKernelArg(kernel[6], 2, sizeof(int), &N);
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
 
-	err = clEnqueueNDRangeKernel(queue, kernel[6], 2, NULL, g6, l6, 0, NULL, NULL);
+	// kernel 8
+	size_t l7 = 256;
+	size_t g7 = N; 
+
+	err = clSetKernelArg(kernel[7], 0, sizeof(cl_mem), &beta_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+	
+	err = clSetKernelArg(kernel[7], 1, sizeof(cl_mem), &alpha_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[7], 2, sizeof(cl_mem), &gamma_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+
+	int TimeLine;
+	for(TimeLine = 0 ; TimeLine <= T-2; ++TimeLine)
+	{
+		tPos_pre = TimeLine * N;
+		tPos = tPos_pre + N;
+
+		// k1: beta x B	  and 		alpha .* beta
+		err = clSetKernelArg(kernel[0], 5, sizeof(uint), &tPos);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+		err = clSetKernelArg(kernel[0], 6, sizeof(uint), &tPos_pre);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+		err = clEnqueueNDRangeKernel(queue, kernel[0], 1, NULL, &g0, &l0, 0, NULL, NULL);
+		OCL_CHECK(err);
+
+		// k2 : A .* (alpha * beta_B)      
+		err = clSetKernelArg(kernel[1], 5, sizeof(uint), &tPos_pre);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+		err = clEnqueueNDRangeKernel(queue, kernel[1], 2, NULL, g1, l1, 0, NULL, NULL);
+		OCL_CHECK(err);
+
+		// k3 : normalise (alpha.*beta)	and update gamma
+		err = clSetKernelArg(kernel[2], 4, sizeof(uint), &tPos_pre);
+		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+		err = clEnqueueNDRangeKernel(queue, kernel[2], 1, NULL, &g2, &l2, 0, NULL, NULL);
+		OCL_CHECK(err);
+
+
+		// k4-7: normalise xi_sum
+		// generate intermediate data for reduction
+		err = clEnqueueNDRangeKernel(queue, kernel[3], 2, NULL, g3, l3, 0, NULL, NULL);
+		OCL_CHECK(err);
+
+		// sum up
+		err = clEnqueueNDRangeKernel(queue, kernel[4], 1, NULL, &g4, &l4, 0, NULL, NULL);
+		OCL_CHECK(err);
+	
+		// scale
+		err = clEnqueueNDRangeKernel(queue, kernel[5], 2, NULL, g5, l5, 0, NULL, NULL);
+		OCL_CHECK(err);
+
+		// add result to xi_sum
+		err = clEnqueueNDRangeKernel(queue, kernel[6], 2, NULL, g6, l6, 0, NULL, NULL);
+		OCL_CHECK(err);
+	}
+
+	// TimeLine = T-1 , at tPos
+	err = clSetKernelArg(kernel[7], 3, sizeof(uint), &tPos);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[7], 1, NULL, &g7, &l7, 0, NULL, NULL);
 	OCL_CHECK(err);
 
+#ifdef DEBUG
+	clFinish(queue);
+	clEnqueueReadBuffer(queue, gamma_d, CL_TRUE, 0, sizeof(float)*T*N, gamma_h, 0, NULL , NULL);
+	printf("\ngamma = \n");
+	for(i=0;i<T;++i){
+		for(j=0;j<N;++j){
+			printf("(%d,%d) = %.4e\n",i,j,gamma_h[i*N+j]);
+		}	
+		printf("\n");
+	}
 
-
-
+	clEnqueueReadBuffer(queue, xisum_d, CL_TRUE, 0, sizeof(float)*N*N, xisum, 0, NULL , NULL);
+	printf("\n\n xi_sum = \n");
+	for(i=0;i<N;++i){
+		for(j=0;j<N;++j){
+			printf("(%d,%d) = %.4e\n",i,j,xisum[i*N+j]);
+		}	
+		printf("\n");
+	}
+#endif
 
 	//----------------------------- M --------------------------------------// 
 
@@ -546,8 +587,6 @@ void run_opencl_em(HMM *word)
 
 		if( window == 0 && 0)
 		{
-			clFinish(queue);
-			clEnqueueReadBuffer(queue, A_alpha_beta_B_d, CL_TRUE, 0, sizeof(float)*N*N, A_alpha_beta_B, 0, NULL , NULL);
 			check_2d_f(A_alpha_beta_B, N, N);	
 			return;
 		}
@@ -902,8 +941,10 @@ void run_opencl_em(HMM *word)
 	free(kernelSource);
 
 	free(xisum);
-	//free(tmp);
 
+#ifdef DEBUG
+	free(gamma_h);
+#endif
 	return;
 }
 

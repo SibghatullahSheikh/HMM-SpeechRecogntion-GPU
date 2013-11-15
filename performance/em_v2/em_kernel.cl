@@ -48,8 +48,8 @@ __kernel void normalise_1d_gamma(
 	__global float *gamma_norm,
 	__global float *gamma,
 	__local volatile float *lds,
-	const uint tPos_pre,
-	const int blks)
+	const int blks,
+	const uint tPos_pre)
 {
 	// launch 256 tpb only, do reduction and then scaling
 	size_t lid = get_local_id(0);
@@ -210,6 +210,18 @@ __kernel void xisum_addon(
 }
 
 
+// kernel 8: N
+__kernel void gammaT(
+	__global float *beta,
+	__global float *alpha,
+	__global float *gamma,
+	const uint tPos)
+{
+	size_t gid = get_global_id(0);
+	size_t id = tPos + gid;
+
+	gamma[id] = alpha[id] * beta[id];	
+}
 
 
 /*
