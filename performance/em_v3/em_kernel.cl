@@ -224,141 +224,168 @@ __kernel void gammaT(
 }
 
 
-/*
-
-// kernel3 : normalise xi_sum
-__kernel void normalise(
-	__global float *xi_sum_norm,
-	__global float *xi_sum,
-	__local volatile float *lds,
+// kernel 9:
+__kernel void mk_stochastic(
+	__global float *xisum,
+	const int iters,
 	const int N)
 {
-	// 256 +  1 
+	//size_t gx = get_global_id(0);  // col
+	size_t gy = get_global_id(1);  // row
 
-	size_t lid = get_local_id(0);
+	size_t lx = get_local_id(0);  // col
+	size_t ly = get_local_id(1);  // row
+
+	size_t lid = ly * TILE + lx;
+
+	size_t gidy = gy * N;
 	size_t gid;
-	float data;
+	
 
-	int i;
+	__local float lds[256];
 
 	lds[lid] = 0.f;
 
-	// work on T-2
+
+	int i;
 	// fetch data to lds
-#pragma unroll
-	for(i=0; i<blks; ++i)
+	#pragma unroll
+	for(i=0; i<iters; ++i)
 	{
-		gid = i*256 + lid;        
-		//data = B[gid] * prior[gid];
-		//printf("(%d) %.4e\n",gid,  alpha[gid]);
-		lds[lid] += beta[startPos + gid];
+		gid = i*TILE + lx + gidy;        
+	 	lds[lid] += xisum[gid];
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	// reduction on 256 
-	if(lid < 128) {lds[lid] += lds[lid + 128];}
-	if(lid <  64) {lds[lid] += lds[lid +  64];}
-	if(lid <  32) {lds[lid] += lds[lid +  32];}
-	if(lid <  16) {lds[lid] += lds[lid +  16];}
-	if(lid <   8) {lds[lid] += lds[lid +   8];}
-	if(lid <   4) {lds[lid] += lds[lid +   4];}
-	if(lid <   2) {lds[lid] += lds[lid +   2];}
-	if(lid <   1) {lds[lid] += lds[lid +   1];}
-
-	if(lid == 0){
-		lds[256] = lds[0];
+	if(lx == 0){
+		float data;
+		// sum up 16 columns
+		data = lds[ly] + lds[ly+1] + lds[ly+2] + lds[ly+3] +
+			lds[ly+4] + lds[ly+5] + lds[ly+6] + lds[ly+7] +
+			lds[ly+8] + lds[ly+9] + lds[ly+10] + lds[ly+11] +
+			lds[ly+12] + lds[ly+13] + lds[ly+14] + lds[ly+15]; 
+	
+		lds[ly] = ( (data == 0.f) ? 1.f : data );
+		//printf("Z1[%d] = %.4e\n", gy,Z1[gy]);
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	// normalise
-#pragma unroll
-	for(i=0; i<blks; ++i)
+	//
+	#pragma unroll
+	for(i=0; i<iters; ++i)
 	{
-		gid = i*256 + lid;        
-		beta[startPos + gid] /= lds[256];
-
-		//printf("(%d) %.4e\n",gid,  beta[startPos + gid]);
+		gid = i*TILE + lx + gidy;        
+	 	xisum[gid] /= lds[ly];
+		//printf("Z1[%d,%d] = %.4e\n", gy,i*TILE + lx,xisum[gid]);
 	}
 
 }
 
-*/
+// kernel 10: gamma_state_sum, sum along time for each state
+__kernel void gamma_state_sum_dev(
+	__global float *gamma,
+	__global float *gamma_state_sum,
+	const int iters,
+	const int N,
+	const uint stride)
+{
+	// tpb: 16 x 16 
+	// stride =  N * TILE 
+	// startPos = gy * stride
+
+	size_t gx = get_global_id(0); // col
+	size_t gy = get_global_id(1); // row 
+
+	size_t lx = get_local_id(0); // col
+	size_t ly = get_local_id(1); // row 
+
+	size_t startPos = gy * N; // first tb position 
+
+	size_t lid = ly * TILE + lx;
+	size_t gid;
+
+	__local float lds[256];
+
+	lds[lid] = 0.f;
+
+	int i;
+	#pragma unroll
+	for(i=0; i<iters; ++i)
+	{
+		gid = i * stride + startPos + gx;        
+		lds[lid] += gamma[gid];
+	}
+	
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	// reduce 16 x 16 to 16 (column) values
+	if(gy == 0)
+	{
+		//float data;	
+		gamma_state_sum[gx]= lds[lx] + 
+						lds[lx + TILE] + 
+						lds[lx + TILE*2] + 
+						lds[lx + TILE*3] + 
+						lds[lx + TILE*4] + 
+						lds[lx + TILE*5] + 
+						lds[lx + TILE*6] + 
+						lds[lx + TILE*7] + 
+						lds[lx + TILE*8] + 
+						lds[lx + TILE*9] + 
+						lds[lx + TILE*10] + 
+						lds[lx + TILE*11] + 
+						lds[lx + TILE*12] + 
+						lds[lx + TILE*13] + 
+						lds[lx + TILE*14] + 
+						lds[lx + TILE*15];
+
+		//gamma_state_sum[gx] = data;
+		//printf("[%d] = %.4e\n", gx, data);
+	}
+
+}
 
 
-// kernel4 : normalise gamma_sum 
+// kernel 11; copy gamma_tmp
+__kernel void copy_currentgamma(
+	__global float *gamma,
+	__global float *gamma_tmp,
+	const int N,
+	const int currentCol)
+{
+	// TxN
+	size_t gid = get_global_id(0); // row number 
+	size_t id = currentCol + gid * N; // copy along column
+	gamma_tmp[gid] = gamma[id];
+}
+
+
+// kernel 12: compute expect_mu
+__kernel void gamma_obs_dev(
+	__global float *observations,
+	__constant float *currentgamma,
+	__global float *gamma_obs,
+	const int T)
+{
+	// D x T
+	size_t gx = get_global_id(0); // T 
+	size_t gy = get_global_id(1); // D 
+
+	size_t lx = get_local_id(0); // T 
+	size_t ly = get_local_id(1); // D 
+
+	size_t gid = gy * T + gx;	
+
+	gamma_obs[gid] = observations[gid] * currentgamma[gx];
+	//printf("[%d,%d] = %.4e\n", gy,gx, gamma_obs[gid]);
+}
 
 
 
-
-
-
-
-// kernel 1 : multiply beta and B
-//			  alpha * beta
 
 /*
-
-__kernel void beta_mul_B(
-	__global float *beta,
-	__global float *B,
-	__global float *alpha,
-	__global float *beta_B, 	// 1st output
-	__global float *alpha_beta, // 2nd output
-	const int N,
-	const int T,
-	const int window)
-{
-	size_t gid = get_global_id(0);
-
-	if(gid < N){
-		beta_B[gid] 	= beta[gid * T + window + 1] * B[gid * T + window + 1];
-		alpha_beta[gid] = alpha[gid * T + window] * beta[gid * T + window];
-	}
-}
-
-
-// kernel 2 : A * ( alpha * beta_B )
-__kernel void A_alpha_beta_B_dev(
-		__global float *beta_B,
-		__global float *alpha,
-		__global float *A,
-		__global float *A_alpha_beta_B,
-		const int N,
-		const int T,
-		const int window)
-{
-	size_t gx = get_global_id(0);
-	size_t gy = get_global_id(1);
-
-	if( gx < N && gy < N )
-	{
-		A_alpha_beta_B[gx * N + gy] = alpha[gx * T + window] * beta_B[gy] * A[gx * N + gy];			
-	}
-}
-
-
-
-// kernel 3 : 
-__kernel void gamma_obs_dev (
-		__global float *gamma,
-		__global float *observations,
-		__global float *gamma_obs,
-		const int D,
-		const int T,
-		const int k)
-{
-	size_t gx = get_global_id(0); // D
-	size_t gy = get_global_id(1); // T
-
-	if( gx < D && gy < T )
-	{
-		gamma_obs[gx * T + gy] = gamma[k * T + gy] * observations[gx * T + gy];	
-	}
-}
-
-
 
 // kernel 4 :
 __kernel void exp_mu_dev (

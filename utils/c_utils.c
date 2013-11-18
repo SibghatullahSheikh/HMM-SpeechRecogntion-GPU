@@ -287,6 +287,8 @@ void mk_stochastic_2d_f(float **x, unsigned int row, unsigned int col, float **o
 		Z1[i]=Z1[i]+Z[i];   
 	}
 
+	// basically, above actions fill the zeros with ones in Z
+
 	//  norm = repmat(S, 1, size(T,2));
 	//  norm = [S S .. S]
 	for(i=0;i<row;++i){
