@@ -47,9 +47,6 @@ void run_opencl_em(HMM *word)
 	float *observations_t = (float*)malloc(sizeof(float)*T*D); // TxD
 	transpose(observations,observations_t,D,T);
 
-
-
-
 	float *xisum = (float*)malloc(sizeof(float)*N*N);
 	memset(xisum,0,sizeof(float)*N*N);
 
@@ -82,7 +79,7 @@ void run_opencl_em(HMM *word)
 
 	cl_int err;
 
-	int numK = 12;
+	int numK = 14;
 	int numE = 1;
 
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*numK);
@@ -174,6 +171,12 @@ void run_opencl_em(HMM *word)
 	kernel[11] = clCreateKernel(program, "gamma_obs_dev", &err);
 	OCL_CHECK(err);
 
+	kernel[12] = clCreateKernel(program, "expect_mu_dev", &err);
+	OCL_CHECK(err);
+
+	kernel[13] = clCreateKernel(program, "expect_sigma_dev", &err);
+	OCL_CHECK(err);
+
 	// device data
 	cl_mem B_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL);
@@ -214,15 +217,17 @@ void run_opencl_em(HMM *word)
 	cl_mem xisum_fin_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float),  NULL, NULL); //  1 
 
-//	cl_mem Z1_d
-//	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,  NULL, NULL); //  mk_stochastic 
-
 	cl_mem gamma_state_sum_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,  NULL, NULL); // N 
 
+	cl_mem gamma_state_sum_current_d
+	= clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float),  NULL, NULL); // 1  
 
 	cl_mem expect_mu_d
 	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*D,  NULL, NULL); // NxD
+
+	cl_mem expect_mu_state_d
+	= clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float)*D,  NULL, NULL); // D
 
 	cl_mem gamma_tmp_d
 	= clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(float)*T,  NULL, NULL); // T 
@@ -231,7 +236,14 @@ void run_opencl_em(HMM *word)
 	= clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float)*T,  NULL, NULL); // T 
 
 	cl_mem gamma_obs_d
-	= clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float)*T*D,  NULL, NULL); // DxT as observations 
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*T*D,  NULL, NULL); // DxT as observations 
+
+	cl_mem expect_sigma_sym_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*D,  NULL, NULL); // DxD 
+
+	cl_mem expect_sigma_d
+	= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*D*D,  NULL, NULL); // NxDxD 
+
 
 
 	// copy from host to device
@@ -610,10 +622,88 @@ void run_opencl_em(HMM *word)
 	OCL_CHECK(err);
 
 	// kernel 13: calcuate expect_mu (N X D), write features D  to earch state(row)
+	clEnqueueCopyBuffer(queue,gamma_state_sum_d,gamma_state_sum_current_d,stateNum,0,sizeof(float),0,NULL,NULL);
+
+	size_t l12[2];
+	size_t g12[2];
+
+	l12[0] = 16;
+	l12[1] = 16;
+
+	g12[0] = 16;
+	g12[1] = D;
+
+	int T_iters = T/16;
+
+	err = clSetKernelArg(kernel[12], 0, sizeof(cl_mem), &gamma_obs_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[12], 1, sizeof(cl_mem), &gamma_state_sum_current_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[12], 2, sizeof(cl_mem), &expect_mu_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[12], 3, sizeof(int), &T);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[12], 4, sizeof(int), &D);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[12], 5, sizeof(int), &T_iters);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[12], 6, sizeof(int), &stateNum);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[12], 2, NULL, g12, l12, 0, NULL, NULL);
+	OCL_CHECK(err);
+
 
 
 	// kernel 14:  gamma_obs * observations_t (matrix multiplication), 
-	// then /gamma_state_sum(s) (sclar)
+	// then /gamma_state_sum(s) (scalar)
+	// then - expect_mu(s) *expect_mu(s)'
+	size_t l13[2];
+	size_t g13[2];
+
+	l13[0] = 8;
+	l13[1] = 8;
+
+	g13[0] = D;
+	g13[1] = D;
+
+	// copy expect_mu(:,s) to expect_mu_state
+	clEnqueueCopyBuffer(queue, expect_mu_d, expect_mu_state_d, stateNum*D, 0, sizeof(float)*D, 0, NULL, NULL);
+	err = clSetKernelArg(kernel[13], 0, sizeof(cl_mem), &gamma_obs_d);
+
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[13], 1, sizeof(cl_mem), &observations_t_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[13], 2, sizeof(cl_mem), &gamma_state_sum_current_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[13], 3, sizeof(cl_mem), &expect_mu_state_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[13], 4, sizeof(cl_mem), &expect_sigma_sym_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[13], 5, sizeof(int), &D);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clSetKernelArg(kernel[13], 6, sizeof(int), &T);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[13], 2, NULL, g13, l13, 0, NULL, NULL);
+	OCL_CHECK(err);
+
+	// kernel 15: apply symmetrize() to expect_sigma_sym
+	// then, update the expect_sigma
+	//
+
 
 
 	for(stateNum = 0; stateNum < N ; ++stateNum)
@@ -625,62 +715,9 @@ void run_opencl_em(HMM *word)
 
 
 
-	// NxN
-	float *xi_sum	= (float*)malloc(sizeof(float)*N*N);
-	init_2d_f(xi_sum,N,N,0.f);
-
-	// NxT
-	float *gamma= (float*)malloc(sizeof(float)*N*T);
-	init_2d_f(gamma,N,T,0.f);
-
-
-	// intermediate data array
-	float *beta_B 		  = (float*)malloc(sizeof(float)*N);
-	float *alpha_beta     = (float*)malloc(sizeof(float)*N); // Nx1
-	//float *alpha_beta_B   = (float*)malloc(sizeof(float)*N*N); // NxN
-	float *A_alpha_beta_B = (float*)malloc(sizeof(float)*N*N); // NxN
-
-	float *gamma_obs 		= (float*)malloc(sizeof(float)*D*T); // DxT
-	//float *gamma_obs_mul	= (float*)malloc(sizeof(float)*D*D); // DxD
-	//float *exp_mu_mul		= (float*)malloc(sizeof(float)*D*D); // DxD
-	float *gammaob_ob_t	    = (float*)malloc(sizeof(float)*D*D); // DxD
-
-	// results
-	float *exp_prior  = (float*)malloc(sizeof(float)*N); // Nx1
-	float *exp_A	  = (float*)malloc(sizeof(float)*N*N);
-	float *exp_mu	  = (float*)malloc(sizeof(float)*D*N);
-	init_2d_f(exp_mu,D,N,0.f);
 	float *exp_sigma;
 	exp_sigma = (float*)malloc(sizeof(float*)*D*D*N); // row x col x height
 	init_3d_f(exp_sigma,D,D,N,0.f);
-
-	float *gamma_state_sum	= (float*)malloc(sizeof(float)*N); // Nx1
-
-
-
-
-	kernel[1] = clCreateKernel(program, "A_alpha_beta_B_dev", &err);
-	OCL_CHECK(err);
-	kernel[2] = clCreateKernel(program, "gamma_obs_dev", &err);
-	OCL_CHECK(err);
-	kernel[3] = clCreateKernel(program, "exp_mu_dev", &err);
-	OCL_CHECK(err);
-	kernel[4] = clCreateKernel(program, "gammaob_ob_t_dev", &err);
-	OCL_CHECK(err);
-	kernel[5] = clCreateKernel(program, "exp_mu_mul_dev", &err);
-	OCL_CHECK(err);
-
-
-	cl_mem A_alpha_beta_B_d 		= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
-	cl_mem A_d 				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*N,  NULL, NULL);
-	cl_mem alpha_beta_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N,    NULL, NULL);
-	cl_mem gamma_obs_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*T,  NULL, NULL); // D x T
-	cl_mem gamma_d				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*N*T,  NULL, NULL); // N x T
-
-	cl_mem gamma_state_sum_d		= clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float)*N,    NULL, NULL); // N 
-	cl_mem exp_mu_d				= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*N,  NULL, NULL); // D x N 
-	cl_mem gammaob_ob_t_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*D,  NULL, NULL); // D x D 
-	//cl_mem exp_mu_mul_d			= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float)*D*D,  NULL, NULL); // D x D 
 
 	// warm up() device
 	float *dummy = (float*)malloc(sizeof(float));
@@ -694,95 +731,6 @@ void run_opencl_em(HMM *word)
 	//------------------------------------------------
 	//  Start OpenCL Execution 
 	//------------------------------------------------
-	int window;
-	double tmp;
-
-
-	for(window = 0; window < (T-1) ; ++window)
-	{
-	//	printf("window = %d\n", window);
-		// kernel 1
-		err = clSetKernelArg(kernel[0], 7, sizeof(int), &window);
-		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	
-		if( window == 0 && 0)
-		{
-			clFinish(queue);
-			//clEnqueueReadBuffer(queue, beta_B_d, 	 CL_TRUE, 0, sizeof(float)*N, beta_B, 	  0, NULL , NULL);
-			//check_1d_f(beta_B, N);	
-			clEnqueueReadBuffer(queue, alpha_beta_d, CL_TRUE, 0, sizeof(float)*N, alpha_beta, 0, NULL , NULL);
-			check_1d_f(alpha_beta, N);	
-
-			return;
-		}
-	
-
-		// kernel 2
-		err  = clSetKernelArg(kernel[1], 6, sizeof(int), &window);
-		if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
-	
-		err = clEnqueueNDRangeKernel(queue, kernel[1], 2, NULL, global_2, local_2, 0, NULL, NULL);
-		OCL_CHECK(err);
-
-		if( window == 0 && 0)
-		{
-			check_2d_f(A_alpha_beta_B, N, N);	
-			return;
-		}
-
-		// copy back A_alpha_beta_B and alpha_beta
-		clEnqueueReadBuffer(queue, A_alpha_beta_B_d, CL_TRUE, 0, sizeof(float)*N*N, A_alpha_beta_B, 0, NULL , NULL);
-		clEnqueueReadBuffer(queue, alpha_beta_d, 	 CL_TRUE, 0, sizeof(float)*N,   alpha_beta, 	0, NULL , NULL);
-
-		normalise_2d_f(A_alpha_beta_B,N,N);
-		normalise_1d_f(alpha_beta,N); 
-
-		for(j=0;j<N;++j){
-			for(k=0;k<N;++k){
-				xi_sum[j*N + k] += A_alpha_beta_B[j*N + k];
-			}
-		}
-
-		for(j=0;j<N;++j){
-			gamma[j*T + window]= alpha_beta[j];
-		}
-
-		// kernel 3 :
-	}
-
-	// update gamma for the last window (T -1)
-	for(j=0;j<N;++j){
-		alpha_beta[j] = alpha[j*T + T-1] * beta [j*T + T-1];
-	}
-	normalise_1d_f(alpha_beta,N);
-	for(j=0;j<N;++j){
-		gamma[j*T + T -1]= alpha_beta[j];
-	}
-
-	//check_2d_f(gamma,N,T);
-
-	// save the expected prior
-	for(i=0;i<N;++i){
-		exp_prior[i] = gamma[i*T + 0];
-	}
-
-	// save the expected A
-	mk_stochastic_2d_f(xi_sum,N,N,exp_A);
-
-	for(i=0;i<N;++i)
-	{
-		tmp = 0.0;
-		for(j=0;j<T;++j){
-			tmp += gamma[i*T + j];
-		}
-		if(tmp == 0.0){
-			tmp = 1.0;
-		}
-		gamma_state_sum[i]=(float)tmp;
-	}	
-
-	
-
 
 	//---------------------------------------
 	// maximization
@@ -1055,11 +1003,20 @@ void run_opencl_em(HMM *word)
 	clReleaseMemObject(xisum_fin_d);
 
 	clReleaseMemObject(gamma_state_sum_d);
+	clReleaseMemObject(gamma_state_sum_current_d);
+
 	clReleaseMemObject(expect_mu_d);
+	clReleaseMemObject(expect_mu_state_d);
 	clReleaseMemObject(gamma_tmp_d);
 	clReleaseMemObject(currentgamma_d);
 
 	clReleaseMemObject(gamma_obs_d);
+
+	clReleaseMemObject(expect_sigma_sym_d);
+
+	clReleaseMemObject(expect_sigma_d);
+	
+
 
 	clReleaseProgram(program);
 	clReleaseContext(context);

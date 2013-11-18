@@ -241,11 +241,11 @@ __kernel void mk_stochastic(
 	size_t gidy = gy * N;
 	size_t gid;
 	
+	size_t ly_TILE = ly * TILE;
 
 	__local float lds[256];
 
 	lds[lid] = 0.f;
-
 
 	int i;
 	// fetch data to lds
@@ -261,12 +261,24 @@ __kernel void mk_stochastic(
 	if(lx == 0){
 		float data;
 		// sum up 16 columns
-		data = lds[ly] + lds[ly+1] + lds[ly+2] + lds[ly+3] +
-			lds[ly+4] + lds[ly+5] + lds[ly+6] + lds[ly+7] +
-			lds[ly+8] + lds[ly+9] + lds[ly+10] + lds[ly+11] +
-			lds[ly+12] + lds[ly+13] + lds[ly+14] + lds[ly+15]; 
+		data = lds[ly_TILE] + 
+			lds[ly_TILE + 1] + 
+			lds[ly_TILE + 2] + 
+			lds[ly_TILE + 3] +
+			lds[ly_TILE + 4] + 
+			lds[ly_TILE + 5] + 
+			lds[ly_TILE + 6] + 
+			lds[ly_TILE + 7] +
+			lds[ly_TILE + 8] + 
+			lds[ly_TILE + 9] + 
+			lds[ly_TILE + 10] + 
+			lds[ly_TILE + 11] +
+			lds[ly_TILE + 12] + 
+			lds[ly_TILE + 13] + 
+			lds[ly_TILE + 14] + 
+			lds[ly_TILE + 15]; 
 	
-		lds[ly] = ( (data == 0.f) ? 1.f : data );
+		lds[ly_TILE] = ( (data == 0.f) ? 1.f : data );
 		//printf("Z1[%d] = %.4e\n", gy,Z1[gy]);
 	}
 
@@ -277,7 +289,7 @@ __kernel void mk_stochastic(
 	for(i=0; i<iters; ++i)
 	{
 		gid = i*TILE + lx + gidy;        
-	 	xisum[gid] /= lds[ly];
+	 	xisum[gid] /= lds[ly_TILE];
 		//printf("Z1[%d,%d] = %.4e\n", gy,i*TILE + lx,xisum[gid]);
 	}
 
@@ -383,108 +395,148 @@ __kernel void gamma_obs_dev(
 }
 
 
-
-
-/*
-
-// kernel 4 :
-__kernel void exp_mu_dev (
-		__global float *gamma_obs,
-		__constant float *gamma_state_sum,
-		__global float *exp_mu,
-		const int D,
-		const int T,
-		const int N,
-		const int k)
+// kernel 13: 
+__kernel void expect_mu_dev (
+	__global float *gamma_obs,
+	__constant float *gamma_state_sum_current,
+	__global float *expect_mu,
+	const int T,
+	const int D,
+	const int iters,
+	const int currentState)
 {
-	size_t gid = get_global_id(0); // D
+	// gamma_obs : D x T
+	// expect_mu : N x D
+	// sum along columns for each row (D)
 
-	if( gid < D )
+	// 16 x 16
+	size_t gx = get_global_id(0); // col
+	size_t gy = get_global_id(1); // row 
+
+	size_t lx = get_local_id(0); // col
+	size_t ly = get_local_id(1); // row 
+
+	size_t lid = ly * TILE + lx;
+
+	size_t gid;
+	size_t gid_y = gy * T;
+
+	//size_t ly_TILE = ly* TILE;
+	size_t ly_TILE = ly<<4;
+
+	__local float lds[256];
+
+	lds[lid] = 0.f;
+
+	int i;
+	#pragma unroll
+	for(i=0; i<iters; ++i)
 	{
-		int j;
-		double tmp = 0.0;
-		for( j = 0; j < T ; ++j ) {
-			tmp += gamma_obs[ gid * T + j];	
-		}
-
-		exp_mu[gid * N + k] = (float)tmp/gamma_state_sum[k];
+		gid = lx + i * TILE + gid_y;        
+		lds[lid] += gamma_obs[gid];
+	}
+	
+	barrier(CLK_LOCAL_MEM_FENCE);
+	
+	if(lx == 0)
+	{
+		float data;
+		// sum up 16 columns
+		data = lds[ly_TILE] + 
+			lds[ly_TILE + 1] + 
+			lds[ly_TILE + 2] + 
+			lds[ly_TILE + 3] +
+			lds[ly_TILE + 4] + 
+			lds[ly_TILE + 5] + 
+			lds[ly_TILE + 6] + 
+			lds[ly_TILE + 7] +
+			lds[ly_TILE + 8] + 
+			lds[ly_TILE + 9] + 
+			lds[ly_TILE + 10] + 
+			lds[ly_TILE + 11] +
+			lds[ly_TILE + 12] + 
+			lds[ly_TILE + 13] + 
+			lds[ly_TILE + 14] + 
+			lds[ly_TILE + 15]; 
+	
+		expect_mu[currentState * D + gy] = data/gamma_state_sum_current[0];
+		//printf("[%d] = %.4e\n", gy, expect_mu[currentState * D + gy]);
 	}
 }
 
-// kernel 5: matrix multiplication
-// 				gamma_obs * observations_t = gammaob_ob_t   ( a * b = c )
 
-__kernel void gammaob_ob_t_dev (
-		__global float *gamma_obs,
-		__global float *observations_t,
-		__global float *gammaob_ob_t,
-		__constant float *gamma_state_sum,
-		__local float *sma,
-		__local float *smb,
-		const int D,
-		const int T,
-		const int k)
+// kernel 14:
+__kernel void expect_sigma_dev(
+	__global float *gamma_obs,
+	__global float *observations_t,	
+	__constant float *gamma_state_sum_current,
+	__constant float *expect_mu_state,
+	__global float *expect_sigma_sym,
+	const int D,
+	const int T)
 {
-	// gamma_obs		[Row][m*TILE+ty]
-	// observations_t 	[m*TILE+tx][Col] 
-	int gx = get_global_id(0); 
-	int gy = get_global_id(1);
+	// (DxT) (TxD) will produce DxD 
+	__local float lds_a[64]; // 8x8
+	__local float lds_b[64]; // 8x8
 
-	int bx = get_group_id(0);
+	int gx = get_global_id(0); //col
+	int gy = get_global_id(1); //row
+
+	int lx = get_local_id(0);
+	int ly = get_local_id(1);
+
+	int bx = get_group_id(0); // T/8
 	int by = get_group_id(1);
 
-	int tx = get_local_id(0);
-	int ty = get_local_id(1);
+	int nx = get_num_groups(0);
 
-	int Row =  bx * TILE + tx;
-	int Col =  by * TILE + ty;
+
+	int Col =  bx * 8 + lx; // global col index for output
+	int Row =  by * 8 + ly; // global row index for output
 
 	float sum = 0.f;        
 
-	int m,kk;
+	int m;
 
-	for ( m = 0; m < T/TILE ; ++m)
+	for ( m = 0; m < nx ; ++m)
 	{
-		sma[tx * TILE + ty] = gamma_obs[Row * T + m * TILE + ty];        
-		smb[tx * TILE + ty] = observations_t[(m * TILE + tx) * T + Col];        
+		lds_a[ly * 8 + lx] = gamma_obs[Row * T + m * 8 + lx];        
+		lds_b[ly * 8 + lx] = observations_t[(m * 8 + ly) * D + Col];        
 
 		barrier(CLK_LOCAL_MEM_FENCE);
-
-
-		for ( kk = 0; kk < TILE ; ++kk) 
+		
+		// matrix mul on LDS
+		// a x b
+		int kk;
+		#pragma unroll
+		for ( kk = 0; kk < 8 ; ++kk) 
 		{
-			sum += sma[tx * TILE + kk] * smb[kk * TILE + ty];
+			sum += lds_a[ly * 8 + kk] * lds_b[kk * 8 + lx];
 		}
 
 		barrier(CLK_LOCAL_MEM_FENCE);
 	}
+	
+	// sum is the mm result of gamma_obs * obs_t
+	// sum * gamma_state_sum(s) - expect_mu(s) * expect_mu(s)'
+	expect_sigma_sym[Row * D + Col] = sum/gamma_state_sum_current[0] - expect_mu_state[Row] * expect_mu_state[Col];
 
-	gammaob_ob_t[Row * D + Col] = sum/gamma_state_sum[k];
-
+//	printf("[%d,%d] = %.4e\n", Row,Col, expect_sigma_sym[Row * D + Col]);
 }
 
 
-
-// kernel 6 : exp_mu * exp_mu'
-__kernel void exp_mu_mul_dev (
-	__global float *exp_mu,
-	//__global float *exp_mu_mul,
-	__global float *gammaob_ob_t,
+// kernel 15: symmetrize
+__kernel void update_expect_sigma(
+	__global float *expect_sigma,	
+	__global float *expect_sigma_sym,
 	const int D,
-	const int N,
-	const int k)
+	const int N)
 {
-	size_t gx = get_global_id(0); // i
-	size_t gy = get_global_id(1); // j
-
-	if( gx < D && gy < D )
-	{
-		//exp_mu_mul[gx * D + gy] = exp_mu[gx * N + k] * exp_mu[gy * N + k];
-		gammaob_ob_t[gx * D + gy] -= (exp_mu[gx * N + k] * exp_mu[gy * N + k]);
-	}
 
 }
 
-*/
+
+
+
 
 
