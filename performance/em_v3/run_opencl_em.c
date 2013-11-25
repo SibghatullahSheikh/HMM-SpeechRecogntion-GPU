@@ -79,7 +79,7 @@ void run_opencl_em(HMM *word)
 
 	cl_int err;
 
-	int numK = 14;
+	int numK = 15;
 	int numE = 1;
 
 	cl_kernel *kernel = (cl_kernel*)malloc(sizeof(cl_kernel)*numK);
@@ -176,6 +176,10 @@ void run_opencl_em(HMM *word)
 
 	kernel[13] = clCreateKernel(program, "expect_sigma_dev", &err);
 	OCL_CHECK(err);
+
+	kernel[14] = clCreateKernel(program, "update_expect_sigma", &err);
+	OCL_CHECK(err);
+
 
 	// device data
 	cl_mem B_d
@@ -675,6 +679,7 @@ void run_opencl_em(HMM *word)
 
 	// copy expect_mu(:,s) to expect_mu_state
 	clEnqueueCopyBuffer(queue, expect_mu_d, expect_mu_state_d, stateNum*D, 0, sizeof(float)*D, 0, NULL, NULL);
+
 	err = clSetKernelArg(kernel[13], 0, sizeof(cl_mem), &gamma_obs_d);
 
 	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
@@ -703,7 +708,28 @@ void run_opencl_em(HMM *word)
 	// kernel 15: apply symmetrize() to expect_sigma_sym
 	// then, update the expect_sigma
 	//
+	uint offset =  stateNum * D * D;
 
+	size_t l14;
+	size_t g14;
+
+	l14 = 256;
+	g14 = D;
+ 
+ 	err = clSetKernelArg(kernel[14], 0, sizeof(cl_mem), &expect_sigma_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+ 	err = clSetKernelArg(kernel[14], 1, sizeof(cl_mem), &expect_sigma_sym_d);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+ 	err = clSetKernelArg(kernel[14], 2, sizeof(int), &D);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+ 	err = clSetKernelArg(kernel[14], 3, sizeof(uint), &offset);
+	if(err != 0) { printf("%d\n",err); OCL_CHECK(err); exit(1);}
+
+	err = clEnqueueNDRangeKernel(queue, kernel[14], 1, NULL, &g14, &l14, 0, NULL, NULL);
+	OCL_CHECK(err);
 
 
 	for(stateNum = 0; stateNum < N ; ++stateNum)

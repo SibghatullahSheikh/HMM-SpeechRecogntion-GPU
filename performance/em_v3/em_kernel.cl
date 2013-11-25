@@ -526,13 +526,35 @@ __kernel void expect_sigma_dev(
 
 
 // kernel 15: symmetrize
+// opt:  need optimization
+
+// each thread control one column
 __kernel void update_expect_sigma(
 	__global float *expect_sigma,	
 	__global float *expect_sigma_sym,
 	const int D,
-	const int N)
+	const uint start)
 {
+	size_t gid = get_global_id(0);
+	size_t lid = get_local_id(0);
+	// DxD
+	int iters = D - 1; 
 
+	float a,b;
+	// 
+	int i;
+	for(i=gid;i<iters;++i)
+	{
+		
+		a = expect_sigma_sym[i*D + gid];	
+		b = expect_sigma_sym[gid*D + i];	
+		if(a<b){
+			// update use b	
+			expect_sigma[start + i*D + gid] = expect_sigma[start + gid*D + i] = b;
+		}else{
+			expect_sigma[start + i*D + gid] = expect_sigma[start + gid*D + i] = a;
+		}
+	}
 }
 
 
